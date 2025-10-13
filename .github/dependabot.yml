@@ -10,3 +10,12 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
+    ignore:
+      # ESLint 9 requiere migración a flat config y actualización de todos los plugins
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # Debe actualizarse junto con eslint-plugin (mismo major version)
+      - dependency-name: "@typescript-eslint/parser"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@typescript-eslint/eslint-plugin"
+        update-types: ["version-update:semver-major"]
