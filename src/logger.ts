@@ -4,6 +4,11 @@ import { LogLevel, Environment, OutputFormat, SupportedLang } from './types';
 import { LoggerConfig, LogEntry, HttpStatusCode, ApplicationErrorCode, ErrorContext } from './types';
 import { XmlProcessor } from './xml';
 import { translate } from './i18n';
+import en from './i18n/en.json';
+import es from './i18n/es.json';
+
+// Diccionario de mensajes i18n cargado estáticamente
+const i18nMessages: Record<SupportedLang, Record<string, string>> = { en, es };
 
 export class Logger {
   private winstonLogger: winston.Logger;
@@ -212,37 +217,33 @@ export class Logger {
   }
 
   error(message: string, params?: Record<string, any>, meta?: any): void {
-  const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
-  const mergedMeta = { ...(params || {}), ...(meta || {}) };
-  this.winstonLogger.error(translated, mergedMeta);
+    const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
+    const mergedMeta = { ...(params || {}), ...(meta || {}) };
+    this.winstonLogger.error(translated, mergedMeta);
   }
 
   warn(message: string, params?: Record<string, any>, meta?: any): void {
-  const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
-  const mergedMeta = { ...(params || {}), ...(meta || {}) };
-  this.winstonLogger.warn(translated, mergedMeta);
+    const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
+    const mergedMeta = { ...(params || {}), ...(meta || {}) };
+    this.winstonLogger.warn(translated, mergedMeta);
   }
 
   info(message: string, params?: Record<string, any>, meta?: any): void {
-  const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
-  const mergedMeta = { ...(params || {}), ...(meta || {}) };
-  this.winstonLogger.info(translated, mergedMeta);
+    const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
+    const mergedMeta = { ...(params || {}), ...(meta || {}) };
+    this.winstonLogger.info(translated, mergedMeta);
   }
 
   private isI18nKey(key: string): boolean {
     // Verifica si la clave existe en el diccionario de mensajes
-    try {
-      const messages = require(`./i18n/${this.config.lang}.json`);
-      return Object.prototype.hasOwnProperty.call(messages, key);
-    } catch {
-      return false;
-    }
+    const messages = i18nMessages[this.config.lang];
+    return messages ? Object.prototype.hasOwnProperty.call(messages, key) : false;
   }
 
   debug(message: string, params?: Record<string, any>, meta?: any): void {
-  const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
-  const mergedMeta = { ...(params || {}), ...(meta || {}) };
-  this.winstonLogger.debug(translated, mergedMeta);
+    const translated = this.isI18nKey(message) ? translate(this.config.lang, message, params) : message;
+    const mergedMeta = { ...(params || {}), ...(meta || {}) };
+    this.winstonLogger.debug(translated, mergedMeta);
   }
 
   // Métodos específicos para códigos de error HTTP

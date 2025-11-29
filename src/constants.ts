@@ -17,6 +17,3 @@ export const DEFAULTS = {
   LOG_LANG: 'en',
   LOG_FORMAT: 'json'
 };
-
-// Reexportar los códigos de error y status si se usan en toda la librería
-export { HttpStatusCode, ApplicationErrorCode } from './types';

@@ -19,7 +19,7 @@ Librería de logging profesional para microservicios Node.js con soporte para m�
 - Variables de entorno:
   - `LOG_LEVEL` (opcional): error, warn, info, debug. Default: info
   - `SERVICE_NAME` (opcional): nombre del microservicio. Default: unknown-service
-  - `NODE_ENV` (opcional): development o production. Default: development
+  - `NODE_ENV` (opcional): local, develop, testing, production. Default: develop
 
 ## Instalación
 
@@ -65,8 +65,7 @@ NODE_ENV=production LOG_LEVEL=info node app.js
 ## Uso básico
 
 ```javascript
-const { Logger } = require('@smdv/logger');
-const { LogLevel, Environment, OutputFormat, SupportedLang, ENV_KEYS, DEFAULTS } = require('@smdv/logger/dist/constants');
+const { Logger, LogLevel, Environment, OutputFormat, SupportedLang, ENV_KEYS, DEFAULTS } = require('@smdv/logger');
 
 
 
@@ -333,13 +332,18 @@ npm run pack
 │   ├── logger.ts         # Clase Logger principal
 │   ├── middleware.ts     # Middleware Express
 │   ├── types.ts          # Definiciones TypeScript
+│   ├── constants.ts      # Constantes y valores por defecto
 │   ├── factory.ts        # Factory para configuraciones
+│   ├── xml.ts            # Procesador XML
+│   ├── i18n/             # Internacionalización
+│   │   ├── index.ts
+│   │   ├── en.json
+│   │   └── es.json
 │   └── __tests__/        # Tests unitarios
 ├── dist/                 # Archivos compilados
 ├── package.json
 ├── tsconfig.json
-├── README.md
-└── .eslintrc.js
+└── README.md
 ```
 
 ## Licencia

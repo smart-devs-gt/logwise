@@ -1,6 +1,6 @@
 {
   "name": "@smdv/logger",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "Librería de logging para microservicios Node.js con soporte para múltiples niveles, formatos JSON y middleware Express",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
