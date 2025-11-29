@@ -1,7 +1,7 @@
 {
-  "name": "@smdv/logger",
+  "name": "@smdv/logwise",
   "version": "1.0.5",
-  "description": "Librería de logging para microservicios Node.js con soporte para múltiples niveles, formatos JSON y middleware Express",
+  "description": "Professional logging library for Node.js microservices with i18n support, multiple levels, JSON format, Express middleware and extensible transports",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -23,8 +23,19 @@
     "express",
     "middleware",
     "json",
-    "typescript"
+    "typescript",
+    "i18n",
+    "nodejs",
+    "logwise"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smart-devs-gt/logwise.git"
+  },
+  "homepage": "https://github.com/smart-devs-gt/logwise#readme",
+  "bugs": {
+    "url": "https://github.com/smart-devs-gt/logwise/issues"
+  },
   "author": "Juan Jose Hernandez <hola@smartdevs.com.gt>",
   "license": "MIT",
   "dependencies": {

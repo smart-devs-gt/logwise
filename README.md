@@ -1,6 +1,6 @@
-# @smdv/logger
+# @smdv/logwise
 
-Librería de logging profesional para microservicios Node.js con soporte para múltiples niveles, formatos JSON, colores en desarrollo y middleware para Express.
+Professional logging library for Node.js microservices with i18n support, multiple levels, JSON format, Express middleware and extensible transports.
 
 ## Características
 
@@ -24,7 +24,7 @@ Librería de logging profesional para microservicios Node.js con soporte para m�
 ## Instalación
 
 ```bash
-npm install @smdv/logger
+npm install @smdv/logwise
 ```
 
 
@@ -65,7 +65,7 @@ NODE_ENV=production LOG_LEVEL=info node app.js
 ## Uso básico
 
 ```javascript
-const { Logger, LogLevel, Environment, OutputFormat, SupportedLang, ENV_KEYS, DEFAULTS } = require('@smdv/logger');
+const { Logger, LogLevel, Environment, OutputFormat, SupportedLang, ENV_KEYS, DEFAULTS } = require('@smdv/logwise');
 
 
 
@@ -95,7 +95,7 @@ logger.warn('Mensaje libre personalizado');
 ## Procesamiento y logging de XML
 
 ```javascript
-const { logger } = require('@smdv/logger');
+const { logger } = require('@smdv/logwise');
 
 const xmlString = `
 <user>
@@ -115,7 +115,7 @@ logger.logXml(xmlString, 'info', { origen: 'servicio-xml' });
 ### Códigos de estado HTTP
 
 ```javascript
-const { logger, HttpStatusCode } = require('@smdv/logger');
+const { logger, HttpStatusCode } = require('@smdv/logwise');
 
 // Logging con códigos HTTP específicos
 logger.logHttpError('Usuario no encontrado', HttpStatusCode.NOT_FOUND, {
@@ -138,7 +138,7 @@ logger.logRequest('API Request', 'GET', '/api/users', 200, 150, {
 ### Códigos de error de aplicación
 
 ```javascript
-const { logger, ApplicationErrorCode } = require('@smdv/logger');
+const { logger, ApplicationErrorCode } = require('@smdv/logwise');
 
 // Errores de autenticación
 logger.logApplicationError('Token expirado', ApplicationErrorCode.AUTH_TOKEN_EXPIRED, {
@@ -193,7 +193,7 @@ logger.logApplicationError('Saldo insuficiente', ApplicationErrorCode.BIZ_INSUFF
 
 ```javascript
 const express = require('express');
-const { logger, requestLogger } = require('@smdv/logger');
+const { logger, requestLogger } = require('@smdv/logwise');
 
 const app = express();
 
@@ -213,7 +213,7 @@ app.listen(3000, () => {
 ### Middleware avanzado con opciones
 
 ```javascript
-const { createRequestLogger } = require('@smdv/logger');
+const { createRequestLogger } = require('@smdv/logwise');
 
 // Middleware con configuración personalizada
 app.use(createRequestLogger({
@@ -260,7 +260,7 @@ Error: DB Down
 ### Logger personalizado
 
 ```javascript
-const { createCustomLogger } = require('@smdv/logger');
+const { createCustomLogger } = require('@smdv/logwise');
 
 const customLogger = createCustomLogger({
   level: 'debug',
@@ -275,7 +275,7 @@ customLogger.debug('Log con configuración personalizada');
 
 ```javascript
 const winston = require('winston');
-const { logger } = require('@smdv/logger');
+const { logger } = require('@smdv/logwise');
 
 // Agregar transport de archivo
 const fileTransport = new winston.transports.File({
@@ -292,7 +292,7 @@ La librería está preparada para agregar transports adicionales:
 
 ```javascript
 // Próximamente disponibles
-const { TransportFactory } = require('@smdv/logger');
+const { TransportFactory } = require('@smdv/logwise');
 
 // CloudWatch (futuro)
 // const cloudWatchTransport = TransportFactory.createCloudWatchTransport({
@@ -326,7 +326,7 @@ npm run pack
 ## Estructura del proyecto
 
 ```
-@smdv/logger/
+@smdv/logwise/
 ├── src/
 │   ├── index.ts          # Exportaciones principales
 │   ├── logger.ts         # Clase Logger principal
