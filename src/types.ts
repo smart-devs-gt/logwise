@@ -34,12 +34,17 @@ export interface LoggerConfig {
   level: LogLevel;
   service: string;
   isDevelopment: boolean;
+  logPretty?: boolean;
   transports?: Transport[];
 }
 
 export interface Transport {
   type: 'console' | 'file' | 'cloudwatch' | 'elk' | 'loki' | 'datadog';
   options?: any;
+}
+
+export interface LogTransport {
+  write(entry: Record<string, any>): void;
 }
 
 export interface RequestLogData {
