@@ -1,7 +1,6 @@
 import en from './en.json';
 import es from './es.json';
-
-export type SupportedLang = 'en' | 'es';
+import { SupportedLang } from '../types';
 
 const messages: Record<SupportedLang, Record<string, string>> = { en, es };
 
