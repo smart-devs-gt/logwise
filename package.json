@@ -39,7 +39,7 @@
   "author": "Juan Jose Hernandez <hola@smartdevs.com.gt>",
   "license": "MIT",
   "dependencies": {
-    "fast-xml-parser": "^5.2.5",
+    "fast-xml-parser": "^5.3.2",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
