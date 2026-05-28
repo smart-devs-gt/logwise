@@ -17,8 +17,19 @@
  */
 
 import 'reflect-metadata';
-import { Request, Response, Router, Application } from 'express';
+import type { Request, Response, Router, Application } from 'express';
 import { Logger } from '../logger';
+
+// Lazy getter — express solo se carga si realmente se usan los decorators
+function getExpress() {
+  try {
+    return require('express');
+  } catch {
+    throw new Error(
+      '[@smdv/logwise] express is required to use route decorators. Install it: npm i express'
+    );
+  }
+}
 
 // Logger interno para decoradores
 const decoratorLogger = new Logger({ service: 'logwise-decorators' });
@@ -223,7 +234,8 @@ export function registerControllers(
     const prefix: string = Reflect.getMetadata(CONTROLLER_PREFIX_KEY, ControllerClass) || '';
     
     // Crear router y registrar rutas
-    const router = Router();
+    const { Router: ExpressRouter } = getExpress();
+    const router = ExpressRouter();
     registerRoutes(router, controllerInstance, options);
     
     // Montar router en la app
