@@ -10,7 +10,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     method: req.method,
     url: req.url,
     userAgent: req.get('User-Agent'),
-    ip: req.ip || req.connection.remoteAddress
+    ip: req.ip || req.socket.remoteAddress
   };
 
   // Log del request entrante
@@ -72,7 +72,7 @@ export function createRequestLogger(options: {
       method: req.method,
       url: req.url,
       userAgent: req.get('User-Agent'),
-      ip: req.ip || req.connection.remoteAddress
+      ip: req.ip || req.socket.remoteAddress
     };
 
     // Incluir headers si está habilitado

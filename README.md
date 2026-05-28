@@ -1,25 +1,17 @@
 # @smdv/logwise
 
-Professional logging library for Node.js microservices with i18n support, multiple levels, JSON format, Express middleware and extensible transports.
+Professional logging library for Node.js microservices. Designed for CloudWatch + Grafana: every log entry is a single-line JSON by default, structured and queryable. Includes i18n support, Express middleware, HTTP error classes, route decorators, and validation decorators.
 
-## Características
+## Features
 
-- ✅ **Niveles configurables**: error, warn, info, debug
-- ✅ **Control por variables de entorno**: LOG_LEVEL y SERVICE_NAME
-- ✅ **Formato JSON estructurado** con timestamp, service, level, message y stack
-- ✅ **Modo desarrollo**: logs colorizados para mejor legibilidad
-- ✅ **Modo producción**: JSON plano optimizado
-- ✅ **Middleware Express**: logging automático de requests
-- ✅ **Extensible**: preparado para transports futuros (CloudWatch, ELK, Loki, Datadog)
-- ✅ **TypeScript**: completamente tipado
-
-## Requisitos
-
-- Node.js >= 16.0.0
-- Variables de entorno:
-  - `LOG_LEVEL` (opcional): error, warn, info, debug. Default: info
-  - `SERVICE_NAME` (opcional): nombre del microservicio. Default: unknown-service
-  - `NODE_ENV` (opcional): local, develop, testing, production. Default: develop
+- **JSON de una línea por evento** — compatible con CloudWatch Logs y Grafana Loki sin configuración extra
+- **Niveles automáticos por entorno** — debug en local/develop, warn en testing/production (override con `LOG_LEVEL`)
+- **`LOG_PRETTY=true`** — formato coloreado con sangría para desarrollo local sin stack de observabilidad
+- **i18n** — mensajes en español e inglés; cambio solo con variable de entorno
+- **Middleware Express** — logging automático de requests/responses
+- **Clases de error HTTP** — `NotFoundError`, `ValidationError`, `UnauthorizedError`, etc.
+- **Decoradores estilo NestJS** — `@Controller`, `@Get`, `@Post`, `@ValidateBody`, etc.
+- **TypeScript** — completamente tipado
 
 ## Instalación
 
@@ -27,329 +19,486 @@ Professional logging library for Node.js microservices with i18n support, multip
 npm install @smdv/logwise
 ```
 
+## Variables de entorno
 
-## Configuración
+| Variable | Valores | Default | Descripción |
+|---|---|---|---|
+| `SERVICE_NAME` | string | `unknown-service` | Nombre del microservicio (aparece en cada log) |
+| `NODE_ENV` | `local` `develop` `testing` `production` | `develop` | Controla el nivel automático de log |
+| `LOG_LEVEL` | `debug` `info` `warn` `error` | — | Fuerza el nivel, ignora `NODE_ENV` |
+| `LOG_LANG` | `es` `en` | `en` | Idioma de los mensajes i18n |
+| `LOG_PRETTY` | `true` `false` | `false` | Activa formato coloreado con sangría |
 
+### Niveles automáticos según `NODE_ENV`
 
-### Variables de entorno
+| Entorno | Nivel | Logs emitidos |
+|---|---|---|
+| `local` | debug | debug · info · warn · error |
+| `develop` | debug | debug · info · warn · error |
+| `testing` | warn | warn · error |
+| `production` | warn | warn · error |
 
-```bash
-# .env
-LOG_LEVEL=info           # (opcional) Forzar nivel de log
-SERVICE_NAME=mi-microservicio
-NODE_ENV=production      # Entorno: local, develop, testing, production
-LOG_LANG=en              # Idioma de los mensajes: 'en' para inglés, 'es' para español. Si no se define, será inglés por defecto.
+> `LOG_LEVEL` toma precedencia sobre `NODE_ENV` si está definido.
+
+## Formato de salida
+
+### Por defecto — JSON compacto (CloudWatch / Grafana)
+
+Cada llamada al logger emite exactamente **una línea JSON**, sin importar cuántos campos tenga el meta.
+
+```json
+{"level":"info","message":"Servicio iniciado correctamente","service":"ms-sale-warehouse","timestamp":"2026-05-28 19:43:00"}
+{"level":"warn","message":"Usuario no encontrado","service":"ms-sale-warehouse","timestamp":"2026-05-28 19:43:01","httpStatus":404,"userId":123}
+{"level":"error","message":"Error en base de datos","service":"ms-sale-warehouse","timestamp":"2026-05-28 19:43:02","errorCode":"DB_001","stack":"Error: ..."}
 ```
 
-El logger tomará automáticamente el idioma configurado en LOG_LANG para todos los mensajes traducidos. No necesitas cambiar el código para cambiar el idioma, solo actualiza la variable de entorno.
+### `LOG_PRETTY=true` — coloreado para desarrollo local
 
-### Niveles automáticos según entorno
+Solo para entornos sin CloudWatch/Grafana (máquina local sin stack de observabilidad).
 
-El nivel mínimo de log se configura automáticamente según el entorno:
-
-| Entorno      | Nivel mínimo | Logs que se escriben           |
-|--------------|--------------|-------------------------------|
-| local        | debug        | debug, info, warn, error       |
-| develop      | debug        | debug, info, warn, error       |
-| testing/uat  | info         | info, warn, error              |
-| production   | warn         | warn, error                    |
-
-Puedes forzar el nivel usando la variable de entorno `LOG_LEVEL` (`error`, `warn`, `info`, `debug`). Si no se define, se toma el valor según el entorno (`NODE_ENV`).
-
-Ejemplo:
-```bash
-NODE_ENV=production LOG_LEVEL=info node app.js
 ```
-
+[INFO]  [develop] 2026-05-28 19:43:00 [ms-sale-warehouse]: Servicio iniciado correctamente
+[WARN]  [develop] 2026-05-28 19:43:01 [ms-sale-warehouse]: Usuario no encontrado
+{
+  "httpStatus": 404,
+  "userId": 123
+}
+[ERROR] [develop] 2026-05-28 19:43:02 [ms-sale-warehouse]: Error en base de datos
+Error: DB Down
+    at Object.<anonymous> (/app/index.js:10:23)
+```
 
 ## Uso básico
 
-```javascript
-const { Logger, LogLevel, Environment, OutputFormat, SupportedLang, ENV_KEYS, DEFAULTS } = require('@smdv/logwise');
+```typescript
+import { logger } from '@smdv/logwise';
 
+// Mensaje libre
+logger.info('Servidor listo en puerto 3000');
+logger.warn('Conexión lenta detectada', undefined, { latencyMs: 1200 });
+logger.error('Fallo al conectar a Redis', undefined, { host: 'redis:6379' });
+logger.debug('Payload recibido', undefined, { body: req.body });
+```
 
+### Logger personalizado
 
-// Inicialización del logger con configuración personalizada
-const logger = new Logger({
-  level: LogLevel.INFO,           // Nivel de log (usa LogLevel del constants)
-  lang: SupportedLang.ES,         // Idioma ('es' o 'en'), por defecto SupportedLang.EN
-  service: 'app1',                // Nombre del servicio
-  environment: Environment.DEVELOP, // Entorno (usa Environment del constants)
-  outputFormat: OutputFormat.JSON   // Formato de salida (usa OutputFormat del constants)
-// Todas las constantes y enums están centralizadas en constants.ts y deben ser reutilizadas en la integración. Evita valores hardcodeados.
+```typescript
+import { Logger, LogLevel, SupportedLang } from '@smdv/logwise';
+
+const log = new Logger({
+  service: 'ms-sale-orders',
+  level: LogLevel.DEBUG,
+  lang: SupportedLang.ES,
+  logPretty: false,   // true solo si no tienes CloudWatch/Grafana
 });
-
-// Ejemplo de logs internacionalizados y personalizados
-// Todos los métodos de log traducen automáticamente el mensaje si es una clave i18n
-logger.info('SERVICE_STARTED'); // → Traducido según idioma configurado
-logger.warn('MEMORY_WARNING'); // → Traducido
-logger.error('DB_ERROR'); // → Traducido
-logger.debug('CUSTOM_MESSAGE', { param: 'valor' }); // → Traducido si existe clave
-
-// También puedes enviar mensajes libres, que se mostrarán tal cual:
-logger.info('Mensaje libre en español');
-logger.warn('Mensaje libre personalizado');
 ```
 
+### Factory helper
 
-## Procesamiento y logging de XML
+```typescript
+import { createCustomLogger } from '@smdv/logwise';
 
-```javascript
-const { logger } = require('@smdv/logwise');
-
-const xmlString = `
-<user>
-  <id>123</id>
-  <name>Juan Pérez</name>
-</user>
-`;
-
-// Procesa y loguea el XML
-logger.logXml(xmlString, 'info', { origen: 'servicio-xml' });
-
-// Puedes cambiar el nivel de log: 'error', 'warn', 'debug', 'info'
+const log = createCustomLogger({ service: 'ms-sale-orders' });
 ```
 
-## Logging con códigos de error HTTP y de aplicación
+## Mensajes i18n
 
-### Códigos de estado HTTP
+El logger detecta automáticamente si el primer argumento es una clave i18n registrada. Si existe, la traduce según `LOG_LANG`; si no, la usa tal cual.
 
-```javascript
-const { logger, HttpStatusCode } = require('@smdv/logwise');
+```typescript
+logger.info('SERVICE_STARTED');           // → "Servicio iniciado correctamente" (es)
+logger.warn('MEMORY_WARNING');            // → "Advertencia de memoria"
+logger.error('DB_ERROR');                 // → "Error en base de datos"
+logger.debug('CUSTOM_MESSAGE', { param: 'valor' }); // → "Mensaje personalizado: valor"
 
-// Logging con códigos HTTP específicos
-logger.logHttpError('Usuario no encontrado', HttpStatusCode.NOT_FOUND, {
+// Mensaje libre (no es clave i18n):
+logger.info('Mensaje ad-hoc sin traducción');
+```
+
+## Logging especializado
+
+### `logHttpError` — errores HTTP con status code
+
+El nivel se elige automáticamente: `>= 500 → error`, `4xx → warn`, resto `→ info`.
+
+```typescript
+import { logger, HttpStatusCode } from '@smdv/logwise';
+
+logger.logHttpError('Recurso no encontrado', HttpStatusCode.NOT_FOUND, {
   userId: 123,
-  endpoint: '/api/users/123'
+  endpoint: '/api/users/123',
 });
 
-logger.logHttpError('Error interno del servidor', HttpStatusCode.INTERNAL_SERVER_ERROR, {
+logger.logHttpError('Error interno', HttpStatusCode.INTERNAL_SERVER_ERROR, {
   component: 'database',
-  operation: 'getUserById'
-});
-
-// Logging de requests con códigos de estado
-logger.logRequest('API Request', 'GET', '/api/users', 200, 150, {
-  userId: 123,
-  userAgent: 'Mozilla/5.0...'
+  operation: 'getUserById',
 });
 ```
 
-### Códigos de error de aplicación
+### `logApplicationError` — errores de dominio con código tipado
 
-```javascript
-const { logger, ApplicationErrorCode } = require('@smdv/logwise');
+El nivel se elige según el prefijo del código:
 
-// Errores de autenticación
-logger.logApplicationError('Token expirado', ApplicationErrorCode.AUTH_TOKEN_EXPIRED, {
-  userId: 123,
-  requestId: 'req-456',
-  component: 'auth-service'
-});
+| Prefijo | Nivel | Significado |
+|---|---|---|
+| `SYS_` `DB_` `EXT_` | error | Infraestructura — requiere atención inmediata |
+| `AUTH_` `BIZ_` `VAL_` | warn | Operacional — flujo esperado |
+| resto | info | Informativo |
 
-// Errores de base de datos
-logger.logApplicationError('Error de conexión a BD', ApplicationErrorCode.DB_CONNECTION_ERROR, {
+```typescript
+import { logger, ApplicationErrorCode } from '@smdv/logwise';
+
+// Infraestructura → error
+logger.logApplicationError('Error de conexión', ApplicationErrorCode.DB_CONNECTION_ERROR, {
   component: 'user-service',
   operation: 'createUser',
-  correlationId: 'corr-789'
+  correlationId: 'corr-789',
 });
 
-// Errores de servicios externos
-logger.logApplicationError('Servicio de pagos no disponible', ApplicationErrorCode.EXT_SERVICE_UNAVAILABLE, {
-  service: 'payment-gateway',
-  endpoint: 'https://api.payments.com/charge',
-  timeout: 5000
-});
-
-// Errores de negocio
+// Negocio → warn
 logger.logApplicationError('Saldo insuficiente', ApplicationErrorCode.BIZ_INSUFFICIENT_BALANCE, {
   userId: 123,
   requestedAmount: 1000,
   availableBalance: 500,
-  operation: 'transfer'
+});
+
+// Validación → warn
+logger.logApplicationError('Campo requerido faltante', ApplicationErrorCode.VAL_REQUIRED_FIELD, {
+  field: 'email',
+  requestId: 'req-456',
 });
 ```
 
 ### Códigos disponibles
 
-#### HTTP Status Codes
-- **2xx**: `OK`, `CREATED`, `ACCEPTED`, `NO_CONTENT`
-- **3xx**: `MOVED_PERMANENTLY`, `FOUND`, `NOT_MODIFIED`
-- **4xx**: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `CONFLICT`, `UNPROCESSABLE_ENTITY`, `TOO_MANY_REQUESTS`
-- **5xx**: `INTERNAL_SERVER_ERROR`, `NOT_IMPLEMENTED`, `BAD_GATEWAY`, `SERVICE_UNAVAILABLE`, `GATEWAY_TIMEOUT`
+**`ApplicationErrorCode`**
+- `AUTH_xxx` — token expirado, inválido, sin permisos
+- `DB_xxx` — conexión, query, transacción, duplicado
+- `EXT_xxx` — servicio externo no disponible, timeout, respuesta inválida
+- `BIZ_xxx` — lógica de negocio, recurso no encontrado, saldo insuficiente
+- `SYS_xxx` — memoria, disco, CPU, red, configuración
+- `VAL_xxx` — campos requeridos, formato inválido, fuera de rango
+- `GEN_xxx` — error genérico
 
-#### Application Error Codes
-- **AUTH_xxx**: Errores de autenticación y autorización
-- **DB_xxx**: Errores de base de datos
-- **EXT_xxx**: Errores de servicios externos
-- **BIZ_xxx**: Errores de lógica de negocio
-- **SYS_xxx**: Errores de sistema
-- **VAL_xxx**: Errores de validación
-- **GEN_xxx**: Errores genéricos
+**`HttpStatusCode`**
+- `2xx`: `OK` `CREATED` `ACCEPTED` `NO_CONTENT`
+- `3xx`: `MOVED_PERMANENTLY` `FOUND` `NOT_MODIFIED`
+- `4xx`: `BAD_REQUEST` `UNAUTHORIZED` `FORBIDDEN` `NOT_FOUND` `METHOD_NOT_ALLOWED` `CONFLICT` `UNPROCESSABLE_ENTITY` `TOO_MANY_REQUESTS`
+- `5xx`: `INTERNAL_SERVER_ERROR` `NOT_IMPLEMENTED` `BAD_GATEWAY` `SERVICE_UNAVAILABLE` `GATEWAY_TIMEOUT`
 
-## Middleware para Express
+### `logRequest` — requests HTTP
 
-### Uso básico
-
-```javascript
-const express = require('express');
-const { logger, requestLogger } = require('@smdv/logwise');
-
-const app = express();
-
-// Middleware básico - loggea todos los requests
-app.use(requestLogger);
-
-app.get('/health', (req, res) => {
-  logger.info('Health check solicitado');
-  res.json({ status: 'OK' });
-});
-
-app.listen(3000, () => {
-  logger.info('Servidor iniciado', { port: 3000 });
-});
+```typescript
+logger.logRequest('API Request', 'GET', '/api/users', 200, 150, { userId: 123 });
+// → info  (2xx)
+// → warn  (4xx)
+// → error (5xx)
 ```
 
-### Middleware avanzado con opciones
+### `logXml` — procesar y loguear XML
 
-```javascript
-const { createRequestLogger } = require('@smdv/logwise');
+```typescript
+import { logger, LogLevel } from '@smdv/logwise';
 
-// Middleware con configuración personalizada
+logger.logXml('<user><id>123</id></user>', LogLevel.INFO, { origen: 'fel-service' });
+// XML válido → lo parsea y loguea como objeto JSON
+// XML inválido → loguea como error con el string original
+```
+
+## Middleware Express
+
+### Básico
+
+```typescript
+import express from 'express';
+import { requestLogger } from '@smdv/logwise';
+
+const app = express();
+app.use(requestLogger);
+```
+
+### Avanzado con opciones
+
+```typescript
+import { createRequestLogger } from '@smdv/logwise';
+
 app.use(createRequestLogger({
-  logBody: true,           // Incluir body del request
-  logHeaders: false,       // No incluir headers
-  skipPaths: ['/health'],  // Saltar estos paths
-  skipSuccessful: false    // No saltar requests exitosos
+  logBody: true,             // incluir req.body en el log
+  logHeaders: false,         // incluir headers
+  skipPaths: ['/health', '/metrics'],  // paths ignorados
+  skipSuccessful: false,     // omitir logs de 2xx
 }));
 ```
 
-## Ejemplos de salida
+## Clases de error HTTP
 
-### Modo desarrollo (NODE_ENV=development)
+Para lanzar errores estandarizados desde controllers o servicios:
 
-```bash
-2024-01-15 10:30:45 [mi-microservicio] info: Servicio iniciado correctamente
-2024-01-15 10:30:46 [mi-microservicio] info: Incoming request
-{
-  "method": "GET",
-  "url": "/api/users",
-  "userAgent": "Mozilla/5.0...",
-  "ip": "127.0.0.1"
+```typescript
+import {
+  NotFoundError,
+  ValidationError,
+  UnauthorizedError,
+  ForbiddenError,
+  ConflictError,
+  UnprocessableEntityError,
+  TooManyRequestsError,
+  InternalServerError,
+  ServiceUnavailableError,
+  DatabaseError,
+  ExternalServiceError,
+} from '@smdv/logwise';
+
+// En un controller:
+throw new NotFoundError('Usuario no encontrado', 'User');
+throw new ValidationError('Datos inválidos', [{ email: ['formato inválido'] }]);
+throw new TooManyRequestsError(undefined, 60); // retryAfter en segundos
+throw new ExternalServiceError(undefined, 'payment-gateway');
+```
+
+### Middleware de manejo de errores
+
+```typescript
+import { createErrorHandler, asyncHandler, notFoundHandler, SupportedLang } from '@smdv/logwise';
+
+// Al final de todas las rutas, antes del error handler:
+app.use(notFoundHandler());
+
+// Error handler global:
+app.use(createErrorHandler({
+  lang: SupportedLang.ES,
+  includeStackInDev: true,
+  onError: (err, req) => {
+    // callback para métricas, alertas, etc.
+  },
+}));
+
+// Wrapper para evitar try/catch en cada handler:
+router.get('/users/:id', asyncHandler(async (req, res) => {
+  const user = await userService.findById(req.params.id);
+  if (!user) throw new NotFoundError();
+  res.json(user);
+}));
+```
+
+## Decoradores HTTP estilo NestJS
+
+Requiere `reflect-metadata`, `class-validator` y `class-transformer` instalados.
+
+```typescript
+import 'reflect-metadata';
+import {
+  Controller, Get, Post, Put, Delete,
+  ValidateBody, ValidateParams, ValidateQuery, Validate,
+  registerControllers,
+} from '@smdv/logwise';
+import { IsString, IsEmail, IsUUID } from 'class-validator';
+
+class CreateUserDTO {
+  @IsString() @IsEmail() email!: string;
+  @IsString() name!: string;
 }
-2024-01-15 10:30:47 [mi-microservicio] warn: Advertencia de memoria
-2024-01-15 10:30:48 [mi-microservicio] error: Error en base de datos
-Error: DB Down
-    at Object.<anonymous> (/app/index.js:10:23)
-    at Module._compile (internal/modules/cjs/loader.js:1063:30)
+
+class IdParamDTO {
+  @IsUUID() id!: string;
+}
+
+@Controller('/users')
+class UserController {
+  @Get('/')
+  async index(req: Request, res: Response) {
+    res.json({ users: [] });
+  }
+
+  @Post('/')
+  @ValidateBody(CreateUserDTO)
+  async store(req: Request, res: Response) {
+    // req.body ya es una instancia validada de CreateUserDTO
+    res.status(201).json({ created: true });
+  }
+
+  @Get('/:id')
+  @ValidateParams(IdParamDTO)
+  async show(req: Request, res: Response) {
+    res.json({ id: req.params.id });
+  }
+
+  @Put('/:id')
+  @Validate({ params: IdParamDTO, body: CreateUserDTO })
+  async update(req: Request, res: Response) {
+    res.json({ updated: true });
+  }
+
+  @Delete('/:id')
+  @ValidateParams(IdParamDTO)
+  async destroy(req: Request, res: Response) {
+    res.status(204).send();
+  }
+}
+
+// Registrar en Express:
+registerControllers(app, [UserController]);
+
+// Configurar idioma de mensajes de validación globalmente:
+import { configureValidation } from '@smdv/logwise';
+configureValidation({ lang: SupportedLang.ES });
 ```
 
-### Modo producción (NODE_ENV=production)
+## Mensajes estándar de respuesta API
 
+```typescript
+import { Messages, getMessage, createMessageHelper, SupportedLang } from '@smdv/logwise';
+
+// Acceso directo (español):
+res.json({ success: true, message: Messages.CREATED_SUCCESS });
+
+// Con i18n dinámico:
+const msg = getMessage(SupportedLang.EN, 'NOT_FOUND');
+
+// Helper con idioma fijo:
+const m = createMessageHelper(SupportedLang.ES);
+res.json({ success: false, message: m.get('BAD_REQUEST') });
+```
+
+## Constantes HTTP
+
+```typescript
+import { HTTP_OK, HTTP_CREATED, HTTP_NOT_FOUND, isSuccessCode, isClientError } from '@smdv/logwise';
+
+res.status(HTTP_CREATED).json({ ... });
+
+if (isClientError(statusCode)) { ... }
+if (isSuccessCode(statusCode)) { ... }
+```
+
+## Debug en producción — activación en caliente
+
+`setLevel()` cambia el nivel de log sin reiniciar el proceso ni redesplegar.
+El segundo parámetro `resetAfterMs` restaura el nivel original automáticamente, evitando olvidar debug encendido en producción.
+
+```typescript
+import { logger, LogLevel } from '@smdv/logwise';
+
+// Activar debug por 30 minutos y volver a warn automáticamente
+logger.setLevel(LogLevel.DEBUG, 30 * 60 * 1000);
+
+// Consultar el nivel activo
+logger.getLevel(); // → 'debug'
+```
+
+Cada cambio emite un log de auditoría visible en CloudWatch:
 ```json
-{"timestamp":"2024-01-15 10:30:45","service":"mi-microservicio","level":"info","message":"Servicio iniciado correctamente"}
-{"timestamp":"2024-01-15 10:30:46","service":"mi-microservicio","level":"info","message":"Incoming request","method":"GET","url":"/api/users","userAgent":"Mozilla/5.0...","ip":"127.0.0.1"}
-{"timestamp":"2024-01-15 10:30:47","service":"mi-microservicio","level":"warn","message":"Advertencia de memoria"}
-{"timestamp":"2024-01-15 10:30:48","service":"mi-microservicio","level":"error","message":"Error en base de datos","stack":"Error: DB Down\n    at Object.<anonymous> (/app/index.js:10:23)"}
-{"timestamp":"2024-01-15 10:30:49","service":"mi-microservicio","level":"warn","message":"Usuario no encontrado","httpStatus":404,"statusCode":404,"userId":123,"endpoint":"/api/users/123"}
-{"timestamp":"2024-01-15 10:30:50","service":"mi-microservicio","level":"error","message":"Error de conexión a BD","errorCode":"DB_001","component":"user-service","operation":"createUser"}
+{"level":"info","message":"Log level changed","service":"ms-sale-orders","from":"warn","to":"debug","resetAfterMs":1800000}
+{"level":"info","message":"Log level restored","service":"ms-sale-orders","to":"warn"}
 ```
 
-## Configuración avanzada
+### Patrón de endpoint admin en Express
 
-### Logger personalizado
+Proteger el endpoint con un token de admin (no exponer sin autenticación):
 
-```javascript
-const { createCustomLogger } = require('@smdv/logwise');
+```typescript
+import express from 'express';
+import { logger, LogLevel } from '@smdv/logwise';
 
-const customLogger = createCustomLogger({
-  level: 'debug',
-  service: 'mi-servicio-especial',
-  isDevelopment: false
+const router = express.Router();
+
+// Middleware de autenticación para rutas admin
+function adminAuth(req: Request, res: Response, next: NextFunction) {
+  const token = req.headers['x-admin-token'];
+  if (token !== process.env.ADMIN_TOKEN) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  next();
+}
+
+// GET /admin/log-level → consultar nivel actual
+router.get('/admin/log-level', adminAuth, (req, res) => {
+  res.json({ level: logger.getLevel() });
 });
 
-customLogger.debug('Log con configuración personalizada');
-```
+// POST /admin/log-level { "level": "debug", "resetAfterMs": 1800000 }
+router.post('/admin/log-level', adminAuth, (req, res) => {
+  const { level, resetAfterMs } = req.body;
 
-### Agregar transports personalizados
+  if (!Object.values(LogLevel).includes(level)) {
+    return res.status(400).json({ success: false, message: 'Invalid level' });
+  }
 
-```javascript
-const winston = require('winston');
-const { logger } = require('@smdv/logwise');
-
-// Agregar transport de archivo
-const fileTransport = new winston.transports.File({
-  filename: 'app.log',
-  format: winston.format.json()
+  logger.setLevel(level as LogLevel, resetAfterMs);
+  res.json({ success: true, level, resetAfterMs });
 });
-
-logger.addTransport(fileTransport);
 ```
 
-## Extensibilidad futura
+**`ADMIN_TOKEN`** debe vivir en Secrets Manager (`dev/{servicio}` o `prod/{servicio}`), nunca en el código.
 
-La librería está preparada para agregar transports adicionales:
-
-```javascript
-// Próximamente disponibles
-const { TransportFactory } = require('@smdv/logwise');
-
-// CloudWatch (futuro)
-// const cloudWatchTransport = TransportFactory.createCloudWatchTransport({
-//   logGroupName: 'mi-app',
-//   logStreamName: 'mi-stream'
-// });
-
-// ELK Stack (futuro)
-// const elkTransport = TransportFactory.createELKTransport({
-//   host: 'elasticsearch.example.com',
-//   port: 9200
-// });
-```
-
-## Scripts de desarrollo
+### Flujo para investigar un error de producción
 
 ```bash
-# Compilar TypeScript
-npm run build
+# 1. Activar debug por 30 minutos en el pod
+curl -X POST https://api.dev-sale.net/ms-sale-orders/admin/log-level \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"level":"debug","resetAfterMs":1800000}'
 
-# Linting
-npm run lint
+# 2. Reproducir el error y observar en CloudWatch / Grafana
+# Los logs de debug aparecen como una sola línea JSON, filtrables por service + level
 
-# Tests
-npm run test
-
-# Empaquetar
-npm run pack
+# 3. El nivel vuelve a warn automáticamente al cumplirse resetAfterMs
+#    o se puede restaurar manualmente:
+curl -X POST https://api.dev-sale.net/ms-sale-orders/admin/log-level \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"level":"warn"}'
 ```
 
-## Estructura del proyecto
+> **Nota de costo**: el modo debug puede multiplicar el volumen de logs en CloudWatch. Usar siempre `resetAfterMs` en producción.
+
+## Transports personalizados
+
+`LogTransport` es la interfaz para agregar destinos de log adicionales (métricas, alertas, tests):
+
+```typescript
+import { LogTransport, logger } from '@smdv/logwise';
+
+class MyTransport implements LogTransport {
+  write(entry: Record<string, any>): void {
+    // entry = { level, message, service, timestamp, ...meta }
+    myMonitoringSystem.send(entry);
+  }
+}
+
+logger.addTransport(new MyTransport());
+```
+
+> Los stubs `TransportFactory.createCloudWatchTransport`, `createELKTransport`, `createLokiTransport` y `createDatadogTransport` son placeholders para implementaciones futuras.
+
+## Scripts
+
+```bash
+npm run build   # compilar TypeScript
+npm run test    # ejecutar tests
+npm run lint    # ESLint
+npm run pack    # empaquetar
+```
+
+## Estructura
 
 ```
-@smdv/logwise/
-├── src/
-│   ├── index.ts          # Exportaciones principales
-│   ├── logger.ts         # Clase Logger principal
-│   ├── middleware.ts     # Middleware Express
-│   ├── types.ts          # Definiciones TypeScript
-│   ├── constants.ts      # Constantes y valores por defecto
-│   ├── factory.ts        # Factory para configuraciones
-│   ├── xml.ts            # Procesador XML
-│   ├── i18n/             # Internacionalización
-│   │   ├── index.ts
-│   │   ├── en.json
-│   │   └── es.json
-│   └── __tests__/        # Tests unitarios
-├── dist/                 # Archivos compilados
-├── package.json
-├── tsconfig.json
-└── README.md
+src/
+├── logger.ts          # Clase Logger principal
+├── middleware.ts      # Middleware Express (requestLogger, createRequestLogger)
+├── factory.ts         # createCustomLogger, TransportFactory
+├── types.ts           # Tipos e interfaces exportados
+├── constants.ts       # ENV_KEYS, DEFAULTS
+├── xml.ts             # XmlProcessor
+├── http/              # Constantes HTTP y helpers
+├── errors/            # ApiError, clases de error, createErrorHandler
+├── messages/          # Mensajes i18n de respuesta API
+├── i18n/              # Mensajes i18n del logger
+├── decorators/        # @Controller, @Get/@Post/…, @ValidateBody/…
+└── __tests__/
 ```
 
 ## Licencia
 
 MIT
-
-## Soporte
-
-Para reportar bugs o solicitar features, crear un issue en el repositorio del proyecto.
