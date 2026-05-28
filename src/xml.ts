@@ -1,5 +1,6 @@
 import { XMLParser, XMLBuilder, XMLValidator } from 'fast-xml-parser';
 
+/** Configuración para el procesador XML */
 export interface XmlConfig {
   ignoreAttributes?: boolean;
   attributeNamePrefix?: string;

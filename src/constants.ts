@@ -7,7 +7,8 @@ export const ENV_KEYS = {
   SERVICE_NAME: 'SERVICE_NAME',
   NODE_ENV: 'NODE_ENV',
   LOG_LANG: 'LOG_LANG',
-  LOG_FORMAT: 'LOG_FORMAT'
+  LOG_FORMAT: 'LOG_FORMAT',
+  LOG_PRETTY: 'LOG_PRETTY'
 };
 
 export const DEFAULTS = {
@@ -15,8 +16,6 @@ export const DEFAULTS = {
   SERVICE_NAME: 'unknown-service',
   NODE_ENV: 'develop',
   LOG_LANG: 'en',
-  LOG_FORMAT: 'json'
+  LOG_FORMAT: 'json',
+  LOG_PRETTY: false
 };
-
-// Reexportar los códigos de error y status si se usan en toda la librería
-export { HttpStatusCode, ApplicationErrorCode } from './types';

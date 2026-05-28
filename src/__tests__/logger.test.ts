@@ -1,22 +1,12 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-// Helper para limpiar códigos de color ANSI
-function stripAnsi(str: string): string {
-  return str.replace(/\x1B\[[0-9;]*m/g, '');
-}
-
 import { Logger } from '../logger';
-import { LogLevel, SupportedLang } from '../types';
+import { LogLevel, SupportedLang, LogTransport } from '../types';
 import { HttpStatusCode, ApplicationErrorCode } from '../types';
 
-import Transport from 'winston-transport';
-
-// Mock transport for winston compatible with winston-transport
-class TestTransport extends Transport {
-  public logs: any[] = [];
-  log(info: any, callback: () => void) {
-    console.log('TestTransport log called:', info);
-    this.logs.push(info);
-    callback();
+class TestTransport implements LogTransport {
+  public logs: Record<string, any>[] = [];
+  write(entry: Record<string, any>): void {
+    this.logs.push(entry);
   }
 }
 
@@ -28,139 +18,186 @@ describe('Logger', () => {
     testTransport.logs = [];
   });
 
-  it('should translate i18n keys for info', async () => {
+  it('should translate i18n keys for info', () => {
     logger.info('SERVICE_STARTED');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.message) === 'Servicio iniciado correctamente')).toBe(true);
+    expect(testTransport.logs.some(log => log.message === 'Servicio iniciado correctamente')).toBe(true);
   });
 
-  it('should translate i18n keys for warn', async () => {
+  it('should translate i18n keys for warn', () => {
     logger.warn('MEMORY_WARNING');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.message) === 'Advertencia de memoria')).toBe(true);
+    expect(testTransport.logs.some(log => log.message === 'Advertencia de memoria')).toBe(true);
   });
 
-  it('should translate i18n keys for error', async () => {
+  it('should translate i18n keys for error', () => {
     logger.error('DB_ERROR');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.message) === 'Error en base de datos')).toBe(true);
+    expect(testTransport.logs.some(log => log.message === 'Error en base de datos')).toBe(true);
   });
 
-  it('should translate i18n keys for debug', async () => {
+  it('should translate i18n keys for debug', () => {
     logger.debug('CUSTOM_MESSAGE', { param: 'valor' });
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.message) === 'Mensaje personalizado: valor')).toBe(true);
+    expect(testTransport.logs.some(log => log.message === 'Mensaje personalizado: valor')).toBe(true);
   });
 
-  it('should log free messages without translation', async () => {
+  it('should log free messages without translation', () => {
     logger.info('Mensaje libre en español');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.message) === 'Mensaje libre en español')).toBe(true);
+    expect(testTransport.logs.some(log => log.message === 'Mensaje libre en español')).toBe(true);
   });
 
-  it('should translate i18n keys for info in English', async () => {
-    const testTransportEn = new TestTransport();
-    const loggerEn = new Logger({ level: LogLevel.INFO, lang: SupportedLang.EN }, [testTransportEn]);
+  it('should translate i18n keys in English', () => {
+    const t = new TestTransport();
+    const loggerEn = new Logger({ level: LogLevel.INFO, lang: SupportedLang.EN }, [t]);
     loggerEn.info('SERVICE_STARTED');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransportEn.logs.some(log => stripAnsi(log.message) === 'Service started successfully')).toBe(true);
+    expect(t.logs.some(log => log.message === 'Service started successfully')).toBe(true);
   });
 
-
-describe('Logger', () => {
-  beforeEach(() => {
-    testTransport.logs = [];
-  });
-
-
-  it('should log info messages', async () => {
+  it('should log info messages', () => {
     logger.info('Test info message');
-    await new Promise(resolve => setImmediate(resolve));
-  expect(testTransport.logs.some(log => stripAnsi(log.level) === 'info' && stripAnsi(log.message) === 'Test info message')).toBe(true);
+    expect(testTransport.logs.some(log => log.level === 'info' && log.message === 'Test info message')).toBe(true);
   });
 
-
-  it('should log error messages with stack trace', async () => {
-    const error = new Error('Test error');
-    logger.error('Test error message', error);
-    await new Promise(resolve => setImmediate(resolve));
-  expect(testTransport.logs.some(log => stripAnsi(log.level) === 'error' && stripAnsi(log.message) === 'Test error message')).toBe(true);
+  it('should log error messages', () => {
+    logger.error('Test error message', { detail: 'something' });
+    expect(testTransport.logs.some(log => log.level === 'error' && log.message === 'Test error message')).toBe(true);
   });
 
-
-  it('should log warn messages', async () => {
+  it('should log warn messages', () => {
     logger.warn('Test warning message');
-    await new Promise(resolve => setImmediate(resolve));
-  expect(testTransport.logs.some(log => stripAnsi(log.level) === 'warn' && stripAnsi(log.message) === 'Test warning message')).toBe(true);
+    expect(testTransport.logs.some(log => log.level === 'warn' && log.message === 'Test warning message')).toBe(true);
   });
 
-
-  it('should log debug messages', async () => {
+  it('should log debug messages', () => {
     logger.debug('Test debug message');
-    await new Promise(resolve => setImmediate(resolve));
-  expect(testTransport.logs.some(log => stripAnsi(log.level) === 'debug' && stripAnsi(log.message) === 'Test debug message')).toBe(true);
+    expect(testTransport.logs.some(log => log.level === 'debug' && log.message === 'Test debug message')).toBe(true);
   });
 
-  it('should include service name in logs', () => {
+  it('should include service name in config', () => {
     const config = logger.getConfig();
     expect(config.service).toBeDefined();
   });
 
-  it('should log with service name "app1"', async () => {
-    const testTransport1 = new TestTransport();
-    const logger1 = new Logger({ level: LogLevel.DEBUG, service: 'app1' }, [testTransport1]);
-    logger1.info('App1 info');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport1.logs.some(log => log.service === 'app1' && stripAnsi(log.message) === 'App1 info')).toBe(true);
+  it('should log with custom service name "app1"', () => {
+    const t = new TestTransport();
+    const l = new Logger({ level: LogLevel.DEBUG, service: 'app1' }, [t]);
+    l.info('App1 info');
+    expect(t.logs.some(log => log.service === 'app1' && log.message === 'App1 info')).toBe(true);
   });
 
-  it('should log with service name "app2"', async () => {
-    const testTransport2 = new TestTransport();
-    const logger2 = new Logger({ level: LogLevel.DEBUG, service: 'app2' }, [testTransport2]);
-    logger2.error('App2 error');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport2.logs.some(log => log.service === 'app2' && stripAnsi(log.message) === 'App2 error')).toBe(true);
+  it('should log with custom service name "app2"', () => {
+    const t = new TestTransport();
+    const l = new Logger({ level: LogLevel.DEBUG, service: 'app2' }, [t]);
+    l.error('App2 error');
+    expect(t.logs.some(log => log.service === 'app2' && log.message === 'App2 error')).toBe(true);
   });
 
-
-  it('should handle metadata objects', async () => {
+  it('should handle metadata objects', () => {
     logger.info('User action', undefined, { userId: 123, action: 'login' });
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.level) === 'info' && stripAnsi(log.message) === 'User action' && log.userId === 123 && log.action === 'login')).toBe(true);
+    expect(testTransport.logs.some(log =>
+      log.level === 'info' &&
+      log.message === 'User action' &&
+      log.userId === 123 &&
+      log.action === 'login'
+    )).toBe(true);
   });
 
+  it('should extract Error objects from meta into message + stack', () => {
+    const err = new Error('DB down');
+    logger.error('DB failed', undefined, { cause: err });
+    const entry = testTransport.logs.find(log => log.message === 'DB failed')!;
+    expect(entry).toBeDefined();
+    expect(entry['cause']).toBe('DB down');
+    expect(entry['stack']).toContain('DB down');
+  });
 
-  it('should log HTTP errors with status codes', async () => {
+  it('should log HTTP 4xx errors as warn', () => {
     logger.logHttpError('Bad request error', HttpStatusCode.BAD_REQUEST, { userId: 123 });
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.level) === 'warn' && stripAnsi(log.message) === 'Bad request error' && log.httpStatus === HttpStatusCode.BAD_REQUEST)).toBe(true);
+    expect(testTransport.logs.some(log =>
+      log.level === 'warn' &&
+      log.message === 'Bad request error' &&
+      log.httpStatus === HttpStatusCode.BAD_REQUEST
+    )).toBe(true);
   });
 
+  it('should log HTTP 5xx errors as error', () => {
+    logger.logHttpError('Internal error', HttpStatusCode.INTERNAL_SERVER_ERROR);
+    expect(testTransport.logs.some(log => log.level === 'error')).toBe(true);
+  });
 
-  it('should log application errors with error codes', async () => {
+  it('should log application DB errors as error', () => {
     logger.logApplicationError('Database connection failed', ApplicationErrorCode.DB_CONNECTION_ERROR, {
       component: 'user-service',
-      operation: 'getUserById'
+      operation: 'getUserById',
     });
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.level) === 'error' && stripAnsi(log.message) === 'Database connection failed' && log.errorCode === ApplicationErrorCode.DB_CONNECTION_ERROR)).toBe(true);
+    expect(testTransport.logs.some(log =>
+      log.level === 'error' &&
+      log.message === 'Database connection failed' &&
+      log.errorCode === ApplicationErrorCode.DB_CONNECTION_ERROR
+    )).toBe(true);
   });
 
+  it('should log application VAL errors as warn', () => {
+    logger.logApplicationError('Campo requerido', ApplicationErrorCode.VAL_REQUIRED_FIELD);
+    expect(testTransport.logs.some(log =>
+      log.level === 'warn' && log.message === 'Campo requerido'
+    )).toBe(true);
+  });
 
-  it('should log requests with status codes', async () => {
+  it('should log requests with status codes', () => {
     logger.logRequest('API request', 'GET', '/api/users', 200, 150, { userId: 123 });
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.level) === 'info' && stripAnsi(log.message) === 'API request' && log.method === 'GET' && log.url === '/api/users')).toBe(true);
+    expect(testTransport.logs.some(log =>
+      log.level === 'info' &&
+      log.message === 'API request' &&
+      log.method === 'GET' &&
+      log.url === '/api/users'
+    )).toBe(true);
   });
 
+  it('should filter out logs below configured level', () => {
+    const t = new TestTransport();
+    const warnLogger = new Logger({ level: LogLevel.WARN }, [t]);
+    warnLogger.debug('should not appear');
+    warnLogger.info('should not appear');
+    warnLogger.warn('should appear');
+    expect(t.logs).toHaveLength(1);
+    expect(t.logs[0].level).toBe('warn');
+  });
 
-  it('should log different levels to appropriate streams', async () => {
-    logger.info('Info message');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.level) === 'info' && stripAnsi(log.message) === 'Info message')).toBe(true);
-    logger.error('Error message');
-    await new Promise(resolve => setImmediate(resolve));
-    expect(testTransport.logs.some(log => stripAnsi(log.level) === 'error' && stripAnsi(log.message) === 'Error message')).toBe(true);
+  it('should add transport via addTransport', () => {
+    const extraTransport = new TestTransport();
+    const l = new Logger({ level: LogLevel.INFO });
+    l.addTransport(extraTransport);
+    l.info('via addTransport');
+    expect(extraTransport.logs.some(log => log.message === 'via addTransport')).toBe(true);
+  });
+
+  describe('setLevel', () => {
+    it('should change level at runtime', () => {
+      const t = new TestTransport();
+      const l = new Logger({ level: LogLevel.WARN }, [t]);
+      l.debug('should be filtered');
+      expect(t.logs.filter(log => log.message === 'should be filtered')).toHaveLength(0);
+
+      l.setLevel(LogLevel.DEBUG);
+      l.debug('now visible');
+      expect(t.logs.some(log => log.message === 'now visible')).toBe(true);
+    });
+
+    it('should emit a log entry when level changes', () => {
+      const t = new TestTransport();
+      const l = new Logger({ level: LogLevel.INFO }, [t]);
+      l.setLevel(LogLevel.DEBUG);
+      const changeLog = t.logs.find(log => log.message === 'Log level changed');
+      expect(changeLog).toBeDefined();
+      expect(changeLog!['from']).toBe(LogLevel.INFO);
+      expect(changeLog!['to']).toBe(LogLevel.DEBUG);
+    });
+
+    it('should restore level after resetAfterMs', async () => {
+      const t = new TestTransport();
+      const l = new Logger({ level: LogLevel.WARN }, [t]);
+      l.setLevel(LogLevel.DEBUG, 50);
+      expect(l.getLevel()).toBe(LogLevel.DEBUG);
+      await new Promise(resolve => setTimeout(resolve, 80));
+      expect(l.getLevel()).toBe(LogLevel.WARN);
+    });
   });
 });
-  });
