@@ -1,0 +1,11 @@
+{
+  "SERVICE_STARTED": "Service started successfully",
+  "MEMORY_WARNING": "Memory warning",
+  "DB_ERROR": "Database error",
+  "USER_AUTHENTICATED": "User authenticated",
+  "ERROR_CAUGHT": "Error caught",
+  "BAD_REQUEST": "Bad request error",
+  "DB_CONNECTION_FAILED": "Database connection failed",
+  "API_REQUEST": "API request",
+  "CUSTOM_MESSAGE": "Custom message: {param}"
+}

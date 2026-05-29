@@ -1,0 +1,11 @@
+{
+  "SERVICE_STARTED": "Servicio iniciado correctamente",
+  "MEMORY_WARNING": "Advertencia de memoria",
+  "DB_ERROR": "Error en base de datos",
+  "USER_AUTHENTICATED": "Usuario autenticado",
+  "ERROR_CAUGHT": "Error capturado",
+  "BAD_REQUEST": "Error de solicitud incorrecta",
+  "DB_CONNECTION_FAILED": "Error de conexión a BD",
+  "API_REQUEST": "Solicitud API",
+  "CUSTOM_MESSAGE": "Mensaje personalizado: {param}"
+}

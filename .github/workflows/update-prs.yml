@@ -1,0 +1,22 @@
+name: Update PRs on develop merge
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - develop
+
+jobs:
+  update-open-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update open PRs with base develop
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: develop
+          destination_branch: "feature/*,fix/*,hotfix/*"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_title: "chore: sync with develop after merge"
+          pr_body: "Actualización automática de ramas abiertas tras merge a develop."
+          pr_label: "sync"
