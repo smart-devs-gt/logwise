@@ -218,6 +218,102 @@ export function createErrorHandler(options: ErrorHandlerOptions = {}) {
 }
 
 /**
+ * Resultado estandarizado de handleError — framework agnostic
+ */
+export interface HandledError {
+  status: number;
+  body: ErrorResponse;
+}
+
+/**
+ * Clasifica un error y devuelve { status, body } sin acoplarse a ningún framework.
+ * Úsalo en el Catch.ts / ErrorHandler de cualquier ms (Adonis, Fastify, etc.)
+ *
+ * @example
+ * // En Catch.ts de AdonisJS:
+ * const { status, body } = handleError(error, logger, 'ms-core-customer');
+ * return response.status(status).json(body);
+ */
+export function handleError(
+  error: any,
+  logger: Logger,
+  service?: string,
+  lang: SupportedLang = SupportedLang.ES
+): HandledError {
+  // Determinar HTTP status
+  const status = getStatusCode(error);
+
+  // Loggear el error real siempre (nunca se expone al cliente)
+  const logMeta = {
+    service,
+    errorName:  error?.name,
+    errorCode:  error instanceof ApiError ? error.code : undefined,
+    stack:      error?.stack?.split('\n').slice(0, 4).join(' | '),
+    sqlMessage: (error as any)?.sqlMessage,
+  };
+
+  if (status >= 500) {
+    logger.error(`[${status}] ${error?.message ?? 'Error desconocido'}`, logMeta);
+  } else {
+    logger.warn(`[${status}] ${error?.message ?? 'Error desconocido'}`, logMeta);
+  }
+
+  // Clasificar errores de MySQL (Adonis Lucid / Knex)
+  const sqlCode = (error as any)?.code;
+  if (sqlCode === 'ER_DUP_ENTRY') {
+    return {
+      status: 409,
+      body: { success: false, message: getMessage(lang, 'CONFLICT'), errors: null, code: 'DUPLICATE_KEY' },
+    };
+  }
+  if (sqlCode === 'ER_NO_REFERENCED_ROW' || sqlCode === 'ER_NO_REFERENCED_ROW_2') {
+    return {
+      status: 422,
+      body: { success: false, message: getMessage(lang, 'UNPROCESSABLE_ENTITY'), errors: null, code: 'UNPROCESSABLE_ENTITY' },
+    };
+  }
+  if (sqlCode && sqlCode.startsWith('ER_')) {
+    return {
+      status: 500,
+      body: { success: false, message: getMessage(lang, 'SERVER_ERROR'), errors: null, code: 'DATABASE_ERROR' },
+    };
+  }
+
+  // Clasificar errores de Adonis (ValidationException, ModelNotFoundException)
+  if (error?.constructor?.name === 'ValidationException' || error?.name === 'ValidationException') {
+    return {
+      status: 422,
+      body: { success: false, message: 'Los datos enviados no son válidos', errors: error?.messages ?? null, code: 'VALIDATION_ERROR' },
+    };
+  }
+  if (error?.constructor?.name === 'ModelNotFoundException') {
+    return {
+      status: 404,
+      body: { success: false, message: getMessage(lang, 'NOT_FOUND'), errors: null, code: 'NOT_FOUND' },
+    };
+  }
+
+  // ApiError (errores operacionales — mensaje seguro para el cliente)
+  if (error instanceof ApiError) {
+    return {
+      status,
+      body: {
+        success: false,
+        message: error.isOperational ? error.message : getMessage(lang, 'SERVER_ERROR'),
+        errors:  extractValidationErrors(error),
+        code:    error.code,
+      },
+    };
+  }
+
+  // Cualquier otro error — mensaje genérico al cliente
+  return {
+    status: status >= 400 ? status : 500,
+    body: { success: false, message: getMessage(lang, 'SERVER_ERROR'), errors: null, code: 'INTERNAL_SERVER_ERROR' },
+  };
+}
+
+/**
  * Wrapper para async handlers (evita try/catch en cada controller)
  * 
  * @example
