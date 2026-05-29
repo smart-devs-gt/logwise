@@ -15,12 +15,21 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { validate, ValidationError } from 'class-validator';
-import { plainToClass } from 'class-transformer';
 import { Logger } from '../logger';
 import { HttpStatusCode } from '../types';
 import { getMessage } from '../messages';
 import { SupportedLang } from '../types';
+
+// Peer dependencies opcionales — cargados en runtime para no
+// crashear en servicios que importan logwise sin usar estos decoradores
+let _validate: Function;
+let _plainToClass: Function;
+try {
+  _validate      = require('class-validator').validate;
+  _plainToClass  = require('class-transformer').plainToClass;
+} catch {
+  // no-op: error descriptivo al intentar usar @ValidateBody etc.
+}
 
 // Logger interno para decoradores
 const validatorLogger = new Logger({ service: 'logwise-validator' });
@@ -81,7 +90,7 @@ function getInternalErrorMessage(): string {
 /**
  * Formatea los errores de class-validator
  */
-function formatValidationErrors(errors: ValidationError[]): Array<Record<string, string[]>> {
+function formatValidationErrors(errors: any[]): Array<Record<string, string[]>> {
   return errors.map((error) => {
     if (error.children && error.children.length > 0) {
       return formatValidationErrors(error.children)[0];
@@ -112,12 +121,12 @@ function createValidationDecorator(
     descriptor.value = async function (req: Request, res: Response, next?: NextFunction) {
       try {
         const data = req[source];
-        const dtoInstance = plainToClass(dtoClass, data, {
+        const dtoInstance = _plainToClass(dtoClass, data, {
           enableImplicitConversion: true,
           excludeExtraneousValues: false,
         });
 
-        const errors = await validate(dtoInstance as object, {
+        const errors = await _validate(dtoInstance as object, {
           whitelist: true,
           forbidNonWhitelisted: false,
           validationError: { target: false, value: false },
@@ -229,11 +238,11 @@ export function Validate(config: {
           if (!dtoClass) continue;
 
           const data = req[source as keyof Request];
-          const dtoInstance = plainToClass(dtoClass, data, {
+          const dtoInstance = _plainToClass(dtoClass, data, {
             enableImplicitConversion: true,
           });
 
-          const errors = await validate(dtoInstance as object, {
+          const errors = await _validate(dtoInstance as object, {
             whitelist: true,
             forbidNonWhitelisted: false,
             validationError: { target: false, value: false },
