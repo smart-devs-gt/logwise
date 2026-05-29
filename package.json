@@ -1,6 +1,6 @@
 {
   "name": "@smdv/logwise",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Professional logging library for Node.js microservices with i18n support, multiple levels, JSON format, Express middleware, HTTP decorators and extensible transports",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
