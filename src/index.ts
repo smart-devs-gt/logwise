@@ -88,8 +88,10 @@ export {
   getErrorLanguage,
   // Error handler middleware
   createErrorHandler,
+  handleError,
   asyncHandler,
   notFoundHandler,
   ErrorHandlerOptions,
   ErrorResponse,
+  HandledError,
 } from './errors';
