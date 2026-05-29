@@ -38,8 +38,10 @@ export {
 // Error handler middleware
 export {
   createErrorHandler,
+  handleError,
   asyncHandler,
   notFoundHandler,
   ErrorHandlerOptions,
   ErrorResponse,
+  HandledError,
 } from './error-handler';
