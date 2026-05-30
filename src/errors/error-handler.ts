@@ -279,14 +279,20 @@ export function handleError(
     };
   }
 
-  // Clasificar errores de Adonis (ValidationException, ModelNotFoundException)
-  if (error?.constructor?.name === 'ValidationException' || error?.name === 'ValidationException') {
+  // Clasificar errores de Adonis
+  // ValidationException — puede venir por nombre de clase o por código E_VALIDATION_FAILURE
+  if (
+    error?.code === 'E_VALIDATION_FAILURE' ||
+    error?.constructor?.name === 'ValidationException' ||
+    error?.name === 'ValidationException'
+  ) {
     return {
       status: 422,
       body: { success: false, message: 'Los datos enviados no son válidos', errors: error?.messages ?? null, code: 'VALIDATION_ERROR' },
     };
   }
-  if (error?.constructor?.name === 'ModelNotFoundException') {
+  // ModelNotFoundException
+  if (error?.code === 'E_ROW_NOT_FOUND' || error?.constructor?.name === 'ModelNotFoundException') {
     return {
       status: 404,
       body: { success: false, message: getMessage(lang, 'NOT_FOUND'), errors: null, code: 'NOT_FOUND' },
