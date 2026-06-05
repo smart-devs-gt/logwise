@@ -1,86 +1,91 @@
 # @smdv/logwise
 
-Professional logging library for Node.js microservices. Designed for CloudWatch + Grafana: every log entry is a single-line JSON by default, structured and queryable. Includes i18n support, Express middleware, HTTP error classes, route decorators, and validation decorators.
+Logging library for Node.js microservices. Every log entry is a single-line JSON — ready for CloudWatch Logs and Grafana Loki with zero configuration.
 
-## Features
+## What it does
 
-- **JSON de una línea por evento** — compatible con CloudWatch Logs y Grafana Loki sin configuración extra
-- **Niveles automáticos por entorno** — debug en local/develop, warn en testing/production (override con `LOG_LEVEL`)
-- **`LOG_PRETTY=true`** — formato coloreado con sangría para desarrollo local sin stack de observabilidad
-- **i18n** — mensajes en español e inglés; cambio solo con variable de entorno
-- **Middleware Express** — logging automático de requests/responses
-- **Clases de error HTTP** — `NotFoundError`, `ValidationError`, `UnauthorizedError`, etc.
-- **Decoradores estilo NestJS** — `@Controller`, `@Get`, `@Post`, `@ValidateBody`, etc.
-- **TypeScript** — completamente tipado
+- **Single-line JSON per event** — structured and queryable by default
+- **Automatic log levels by environment** — `debug` in local/develop, `warn` in testing/production
+- **`LOG_PRETTY=true`** — colorized, indented output for local development without an observability stack
+- **`setLevel()` hot-reload** — change log level at runtime without restarting the process
+- **Express middleware** — automatic request/response logging
+- **HTTP-style decorators** — `@Controller`, `@Get`, `@Post`, `@ValidateBody`, etc. (NestJS-style for Express)
+- **Full TypeScript support**
 
-## Instalación
+> **Error classes, HTTP response helpers, and API messages** are provided by [`@smdv/middleware`](https://www.npmjs.com/package/@smdv/middleware), not this package.
+
+## Installation
 
 ```bash
 npm install @smdv/logwise
 ```
 
-## Variables de entorno
+## Environment variables
 
-| Variable | Valores | Default | Descripción |
+| Variable | Values | Default | Description |
 |---|---|---|---|
-| `SERVICE_NAME` | string | `unknown-service` | Nombre del microservicio (aparece en cada log) |
-| `NODE_ENV` | `local` `develop` `testing` `production` | `develop` | Controla el nivel automático de log |
-| `LOG_LEVEL` | `debug` `info` `warn` `error` | — | Fuerza el nivel, ignora `NODE_ENV` |
-| `LOG_LANG` | `es` `en` | `en` | Idioma de los mensajes i18n |
-| `LOG_PRETTY` | `true` `false` | `false` | Activa formato coloreado con sangría |
+| `SERVICE_NAME` | string | `unknown-service` | Injected into every log entry |
+| `NODE_ENV` | `local` `develop` `testing` `production` | `develop` | Controls automatic log level |
+| `LOG_LEVEL` | `debug` `info` `warn` `error` | — | Overrides `NODE_ENV` level |
+| `LOG_LANG` | `es` `en` | `en` | Language for built-in i18n messages |
+| `LOG_PRETTY` | `true` `false` | `false` | Colorized output (local only — never in CloudWatch environments) |
 
-### Niveles automáticos según `NODE_ENV`
+### Automatic levels by `NODE_ENV`
 
-| Entorno | Nivel | Logs emitidos |
+| Environment | Active level | Logs emitted |
 |---|---|---|
-| `local` | debug | debug · info · warn · error |
-| `develop` | debug | debug · info · warn · error |
-| `testing` | warn | warn · error |
-| `production` | warn | warn · error |
+| `local` / `develop` | `debug` | debug · info · warn · error |
+| `testing` / `production` | `warn` | warn · error |
 
-> `LOG_LEVEL` toma precedencia sobre `NODE_ENV` si está definido.
+> `LOG_LEVEL` takes precedence over `NODE_ENV` when set.
 
-## Formato de salida
+## Output format
 
-### Por defecto — JSON compacto (CloudWatch / Grafana)
+### Default — compact JSON (CloudWatch / Grafana)
 
-Cada llamada al logger emite exactamente **una línea JSON**, sin importar cuántos campos tenga el meta.
+Each call emits exactly **one JSON line**, regardless of how many meta fields are included.
 
 ```json
-{"level":"info","message":"Servicio iniciado correctamente","service":"ms-sale-warehouse","timestamp":"2026-05-28 19:43:00"}
-{"level":"warn","message":"Usuario no encontrado","service":"ms-sale-warehouse","timestamp":"2026-05-28 19:43:01","httpStatus":404,"userId":123}
-{"level":"error","message":"Error en base de datos","service":"ms-sale-warehouse","timestamp":"2026-05-28 19:43:02","errorCode":"DB_001","stack":"Error: ..."}
+{"level":"info","message":"Server started","service":"ms-sale-orders","timestamp":"2026-06-04 10:00:00"}
+{"level":"warn","message":"Slow connection","service":"ms-sale-orders","timestamp":"2026-06-04 10:00:01","latencyMs":1500}
+{"level":"error","message":"DB connection failed","service":"ms-sale-orders","timestamp":"2026-06-04 10:00:02","host":"mysql:3306"}
 ```
 
-### `LOG_PRETTY=true` — coloreado para desarrollo local
-
-Solo para entornos sin CloudWatch/Grafana (máquina local sin stack de observabilidad).
+### `LOG_PRETTY=true` — colorized for local development
 
 ```
-[INFO]  [develop] 2026-05-28 19:43:00 [ms-sale-warehouse]: Servicio iniciado correctamente
-[WARN]  [develop] 2026-05-28 19:43:01 [ms-sale-warehouse]: Usuario no encontrado
+[INFO]  [develop] 2026-06-04 10:00:00 [ms-sale-orders]: Server started
+[WARN]  [develop] 2026-06-04 10:00:01 [ms-sale-orders]: Slow connection
 {
-  "httpStatus": 404,
-  "userId": 123
+  "latencyMs": 1500
 }
-[ERROR] [develop] 2026-05-28 19:43:02 [ms-sale-warehouse]: Error en base de datos
-Error: DB Down
+[ERROR] [develop] 2026-06-04 10:00:02 [ms-sale-orders]: DB connection failed
+Error: ECONNREFUSED
     at Object.<anonymous> (/app/index.js:10:23)
 ```
 
-## Uso básico
+## Basic usage
 
 ```typescript
 import { logger } from '@smdv/logwise';
 
-// Mensaje libre
-logger.info('Servidor listo en puerto 3000');
-logger.warn('Conexión lenta detectada', undefined, { latencyMs: 1200 });
-logger.error('Fallo al conectar a Redis', undefined, { host: 'redis:6379' });
-logger.debug('Payload recibido', undefined, { body: req.body });
+logger.info('Server ready on port 3000');
+logger.warn('Slow connection detected', undefined, { latencyMs: 1200 });
+logger.error('Failed to connect to Redis', undefined, { host: 'redis:6379' });
+logger.debug('Request payload', undefined, { body: req.body });
 ```
 
-### Logger personalizado
+## Factory helper (recommended)
+
+```typescript
+import { createCustomLogger } from '@smdv/logwise';
+
+const logger = createCustomLogger({ service: process.env.APP_NAME || 'ms-sale-orders' });
+
+logger.info('Order created', undefined, { orderId: 42 });
+```
+
+## Custom logger instance
 
 ```typescript
 import { Logger, LogLevel, SupportedLang } from '@smdv/logwise';
@@ -89,104 +94,66 @@ const log = new Logger({
   service: 'ms-sale-orders',
   level: LogLevel.DEBUG,
   lang: SupportedLang.ES,
-  logPretty: false,   // true solo si no tienes CloudWatch/Grafana
+  logPretty: false,
 });
 ```
 
-### Factory helper
+## i18n messages
+
+The logger checks if the first argument is a registered i18n key. If it exists, it translates it using `LOG_LANG`; otherwise it uses the string as-is.
 
 ```typescript
-import { createCustomLogger } from '@smdv/logwise';
+logger.info('SERVICE_STARTED');    // → "Service started successfully" (en)
+logger.warn('MEMORY_WARNING');     // → "Memory warning"
+logger.error('DB_ERROR');          // → "Database error"
 
-const log = createCustomLogger({ service: 'ms-sale-orders' });
+// Free-form message (not an i18n key):
+logger.info('Custom message without translation');
 ```
 
-## Mensajes i18n
+## Specialized logging methods
 
-El logger detecta automáticamente si el primer argumento es una clave i18n registrada. Si existe, la traduce según `LOG_LANG`; si no, la usa tal cual.
+### `logHttpError` — HTTP errors with automatic level selection
 
-```typescript
-logger.info('SERVICE_STARTED');           // → "Servicio iniciado correctamente" (es)
-logger.warn('MEMORY_WARNING');            // → "Advertencia de memoria"
-logger.error('DB_ERROR');                 // → "Error en base de datos"
-logger.debug('CUSTOM_MESSAGE', { param: 'valor' }); // → "Mensaje personalizado: valor"
-
-// Mensaje libre (no es clave i18n):
-logger.info('Mensaje ad-hoc sin traducción');
-```
-
-## Logging especializado
-
-### `logHttpError` — errores HTTP con status code
-
-El nivel se elige automáticamente: `>= 500 → error`, `4xx → warn`, resto `→ info`.
+Level is chosen automatically: `>= 500 → error`, `4xx → warn`, otherwise `info`.
 
 ```typescript
 import { logger, HttpStatusCode } from '@smdv/logwise';
 
-logger.logHttpError('Recurso no encontrado', HttpStatusCode.NOT_FOUND, {
+logger.logHttpError('Resource not found', HttpStatusCode.NOT_FOUND, {
   userId: 123,
   endpoint: '/api/users/123',
 });
-
-logger.logHttpError('Error interno', HttpStatusCode.INTERNAL_SERVER_ERROR, {
-  component: 'database',
-  operation: 'getUserById',
-});
 ```
 
-### `logApplicationError` — errores de dominio con código tipado
+### `logApplicationError` — domain errors with typed codes
 
-El nivel se elige según el prefijo del código:
+Level is chosen by code prefix:
 
-| Prefijo | Nivel | Significado |
+| Prefix | Level | Meaning |
 |---|---|---|
-| `SYS_` `DB_` `EXT_` | error | Infraestructura — requiere atención inmediata |
-| `AUTH_` `BIZ_` `VAL_` | warn | Operacional — flujo esperado |
-| resto | info | Informativo |
+| `SYS_` `DB_` `EXT_` | error | Infrastructure — needs immediate attention |
+| `AUTH_` `BIZ_` `VAL_` | warn | Operational — expected flow |
+| other | info | Informational |
 
 ```typescript
 import { logger, ApplicationErrorCode } from '@smdv/logwise';
 
-// Infraestructura → error
-logger.logApplicationError('Error de conexión', ApplicationErrorCode.DB_CONNECTION_ERROR, {
+logger.logApplicationError('Connection refused', ApplicationErrorCode.DB_CONNECTION_ERROR, {
   component: 'user-service',
   operation: 'createUser',
-  correlationId: 'corr-789',
 });
 
-// Negocio → warn
-logger.logApplicationError('Saldo insuficiente', ApplicationErrorCode.BIZ_INSUFFICIENT_BALANCE, {
+logger.logApplicationError('Insufficient balance', ApplicationErrorCode.BIZ_INSUFFICIENT_BALANCE, {
   userId: 123,
   requestedAmount: 1000,
   availableBalance: 500,
 });
-
-// Validación → warn
-logger.logApplicationError('Campo requerido faltante', ApplicationErrorCode.VAL_REQUIRED_FIELD, {
-  field: 'email',
-  requestId: 'req-456',
-});
 ```
 
-### Códigos disponibles
+Available code groups: `AUTH_*` · `DB_*` · `EXT_*` · `BIZ_*` · `SYS_*` · `VAL_*` · `GEN_*`
 
-**`ApplicationErrorCode`**
-- `AUTH_xxx` — token expirado, inválido, sin permisos
-- `DB_xxx` — conexión, query, transacción, duplicado
-- `EXT_xxx` — servicio externo no disponible, timeout, respuesta inválida
-- `BIZ_xxx` — lógica de negocio, recurso no encontrado, saldo insuficiente
-- `SYS_xxx` — memoria, disco, CPU, red, configuración
-- `VAL_xxx` — campos requeridos, formato inválido, fuera de rango
-- `GEN_xxx` — error genérico
-
-**`HttpStatusCode`**
-- `2xx`: `OK` `CREATED` `ACCEPTED` `NO_CONTENT`
-- `3xx`: `MOVED_PERMANENTLY` `FOUND` `NOT_MODIFIED`
-- `4xx`: `BAD_REQUEST` `UNAUTHORIZED` `FORBIDDEN` `NOT_FOUND` `METHOD_NOT_ALLOWED` `CONFLICT` `UNPROCESSABLE_ENTITY` `TOO_MANY_REQUESTS`
-- `5xx`: `INTERNAL_SERVER_ERROR` `NOT_IMPLEMENTED` `BAD_GATEWAY` `SERVICE_UNAVAILABLE` `GATEWAY_TIMEOUT`
-
-### `logRequest` — requests HTTP
+### `logRequest` — HTTP requests
 
 ```typescript
 logger.logRequest('API Request', 'GET', '/api/users', 200, 150, { userId: 123 });
@@ -195,19 +162,117 @@ logger.logRequest('API Request', 'GET', '/api/users', 200, 150, { userId: 123 })
 // → error (5xx)
 ```
 
-### `logXml` — procesar y loguear XML
+### `logXml` — parse and log XML
 
 ```typescript
 import { logger, LogLevel } from '@smdv/logwise';
 
-logger.logXml('<user><id>123</id></user>', LogLevel.INFO, { origen: 'fel-service' });
-// XML válido → lo parsea y loguea como objeto JSON
-// XML inválido → loguea como error con el string original
+logger.logXml('<user><id>123</id></user>', LogLevel.INFO, { source: 'fel-service' });
+// Valid XML → parsed and logged as JSON
+// Invalid XML → logged as error with raw string
 ```
 
-## Middleware Express
+## `HttpStatusCode` enum
 
-### Básico
+```typescript
+import { HttpStatusCode } from '@smdv/logwise';
+
+// 2xx
+HttpStatusCode.OK                   // 200
+HttpStatusCode.CREATED              // 201
+HttpStatusCode.NO_CONTENT           // 204
+
+// 4xx
+HttpStatusCode.BAD_REQUEST          // 400
+HttpStatusCode.UNAUTHORIZED         // 401
+HttpStatusCode.FORBIDDEN            // 403
+HttpStatusCode.NOT_FOUND            // 404
+HttpStatusCode.CONFLICT             // 409
+HttpStatusCode.UNPROCESSABLE_ENTITY // 422
+HttpStatusCode.TOO_MANY_REQUESTS    // 429
+
+// 5xx
+HttpStatusCode.INTERNAL_SERVER_ERROR // 500
+HttpStatusCode.SERVICE_UNAVAILABLE   // 503
+HttpStatusCode.GATEWAY_TIMEOUT       // 504
+```
+
+## Hot reload — change log level at runtime
+
+`setLevel()` changes the log level without restarting the process or redeploying.
+`resetAfterMs` automatically restores the original level — prevents accidentally leaving debug on in production.
+
+```typescript
+import { logger, LogLevel } from '@smdv/logwise';
+
+// Enable debug for 30 minutes, then revert to warn automatically
+logger.setLevel(LogLevel.DEBUG, 30 * 60 * 1000);
+
+// Query the current level
+logger.getLevel(); // → 'debug'
+```
+
+Each change emits an audit log visible in CloudWatch:
+
+```json
+{"level":"info","message":"Log level changed","service":"ms-sale-orders","from":"warn","to":"debug","resetAfterMs":1800000}
+{"level":"info","message":"Log level restored","service":"ms-sale-orders","to":"warn"}
+```
+
+### Admin endpoint pattern (Express)
+
+```typescript
+import express from 'express';
+import { logger, LogLevel } from '@smdv/logwise';
+
+const router = express.Router();
+
+function adminAuth(req: any, res: any, next: any) {
+  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  next();
+}
+
+router.get('/admin/log-level', adminAuth, (_req, res) => {
+  res.json({ level: logger.getLevel() });
+});
+
+router.post('/admin/log-level', adminAuth, (req, res) => {
+  const { level, resetAfterMs } = req.body;
+  if (!Object.values(LogLevel).includes(level)) {
+    return res.status(400).json({ success: false, message: 'Invalid level' });
+  }
+  logger.setLevel(level as LogLevel, resetAfterMs);
+  res.json({ success: true, level, resetAfterMs });
+});
+```
+
+> `ADMIN_TOKEN` must live in a secrets manager (AWS Secrets Manager, Vault, etc.) — never in source code.
+
+### Investigating a production error
+
+```bash
+# 1. Enable debug for 30 minutes
+curl -X POST https://api.example.com/ms-sale-orders/admin/log-level \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"level":"debug","resetAfterMs":1800000}'
+
+# 2. Reproduce the error and observe in CloudWatch / Grafana
+
+# 3. Level reverts automatically — or restore manually:
+curl -X POST https://api.example.com/ms-sale-orders/admin/log-level \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"level":"warn"}'
+```
+
+> Debug mode can multiply CloudWatch log volume significantly. Always use `resetAfterMs` in production.
+
+## Express middleware
+
+### Basic
 
 ```typescript
 import express from 'express';
@@ -217,79 +282,28 @@ const app = express();
 app.use(requestLogger);
 ```
 
-### Avanzado con opciones
+### Advanced
 
 ```typescript
 import { createRequestLogger } from '@smdv/logwise';
 
 app.use(createRequestLogger({
-  logBody: true,             // incluir req.body en el log
-  logHeaders: false,         // incluir headers
-  skipPaths: ['/health', '/metrics'],  // paths ignorados
-  skipSuccessful: false,     // omitir logs de 2xx
+  logBody: true,
+  logHeaders: false,
+  skipPaths: ['/health', '/metrics'],
+  skipSuccessful: false,
 }));
 ```
 
-## Clases de error HTTP
+## HTTP-style decorators (Express)
 
-Para lanzar errores estandarizados desde controllers o servicios:
-
-```typescript
-import {
-  NotFoundError,
-  ValidationError,
-  UnauthorizedError,
-  ForbiddenError,
-  ConflictError,
-  UnprocessableEntityError,
-  TooManyRequestsError,
-  InternalServerError,
-  ServiceUnavailableError,
-  DatabaseError,
-  ExternalServiceError,
-} from '@smdv/logwise';
-
-// En un controller:
-throw new NotFoundError('Usuario no encontrado', 'User');
-throw new ValidationError('Datos inválidos', [{ email: ['formato inválido'] }]);
-throw new TooManyRequestsError(undefined, 60); // retryAfter en segundos
-throw new ExternalServiceError(undefined, 'payment-gateway');
-```
-
-### Middleware de manejo de errores
-
-```typescript
-import { createErrorHandler, asyncHandler, notFoundHandler, SupportedLang } from '@smdv/logwise';
-
-// Al final de todas las rutas, antes del error handler:
-app.use(notFoundHandler());
-
-// Error handler global:
-app.use(createErrorHandler({
-  lang: SupportedLang.ES,
-  includeStackInDev: true,
-  onError: (err, req) => {
-    // callback para métricas, alertas, etc.
-  },
-}));
-
-// Wrapper para evitar try/catch en cada handler:
-router.get('/users/:id', asyncHandler(async (req, res) => {
-  const user = await userService.findById(req.params.id);
-  if (!user) throw new NotFoundError();
-  res.json(user);
-}));
-```
-
-## Decoradores HTTP estilo NestJS
-
-Requiere `reflect-metadata`, `class-validator` y `class-transformer` instalados.
+Requires `reflect-metadata`, `class-validator`, and `class-transformer`.
 
 ```typescript
 import 'reflect-metadata';
 import {
   Controller, Get, Post, Put, Delete,
-  ValidateBody, ValidateParams, ValidateQuery, Validate,
+  ValidateBody, ValidateParams, Validate,
   registerControllers,
 } from '@smdv/logwise';
 import { IsString, IsEmail, IsUUID } from 'class-validator';
@@ -313,7 +327,6 @@ class UserController {
   @Post('/')
   @ValidateBody(CreateUserDTO)
   async store(req: Request, res: Response) {
-    // req.body ya es una instancia validada de CreateUserDTO
     res.status(201).json({ created: true });
   }
 
@@ -328,134 +341,13 @@ class UserController {
   async update(req: Request, res: Response) {
     res.json({ updated: true });
   }
-
-  @Delete('/:id')
-  @ValidateParams(IdParamDTO)
-  async destroy(req: Request, res: Response) {
-    res.status(204).send();
-  }
 }
 
-// Registrar en Express:
+// Register with Express
 registerControllers(app, [UserController]);
-
-// Configurar idioma de mensajes de validación globalmente:
-import { configureValidation } from '@smdv/logwise';
-configureValidation({ lang: SupportedLang.ES });
 ```
 
-## Mensajes estándar de respuesta API
-
-```typescript
-import { Messages, getMessage, createMessageHelper, SupportedLang } from '@smdv/logwise';
-
-// Acceso directo (español):
-res.json({ success: true, message: Messages.CREATED_SUCCESS });
-
-// Con i18n dinámico:
-const msg = getMessage(SupportedLang.EN, 'NOT_FOUND');
-
-// Helper con idioma fijo:
-const m = createMessageHelper(SupportedLang.ES);
-res.json({ success: false, message: m.get('BAD_REQUEST') });
-```
-
-## Constantes HTTP
-
-```typescript
-import { HTTP_OK, HTTP_CREATED, HTTP_NOT_FOUND, isSuccessCode, isClientError } from '@smdv/logwise';
-
-res.status(HTTP_CREATED).json({ ... });
-
-if (isClientError(statusCode)) { ... }
-if (isSuccessCode(statusCode)) { ... }
-```
-
-## Debug en producción — activación en caliente
-
-`setLevel()` cambia el nivel de log sin reiniciar el proceso ni redesplegar.
-El segundo parámetro `resetAfterMs` restaura el nivel original automáticamente, evitando olvidar debug encendido en producción.
-
-```typescript
-import { logger, LogLevel } from '@smdv/logwise';
-
-// Activar debug por 30 minutos y volver a warn automáticamente
-logger.setLevel(LogLevel.DEBUG, 30 * 60 * 1000);
-
-// Consultar el nivel activo
-logger.getLevel(); // → 'debug'
-```
-
-Cada cambio emite un log de auditoría visible en CloudWatch:
-```json
-{"level":"info","message":"Log level changed","service":"ms-sale-orders","from":"warn","to":"debug","resetAfterMs":1800000}
-{"level":"info","message":"Log level restored","service":"ms-sale-orders","to":"warn"}
-```
-
-### Patrón de endpoint admin en Express
-
-Proteger el endpoint con un token de admin (no exponer sin autenticación):
-
-```typescript
-import express from 'express';
-import { logger, LogLevel } from '@smdv/logwise';
-
-const router = express.Router();
-
-// Middleware de autenticación para rutas admin
-function adminAuth(req: Request, res: Response, next: NextFunction) {
-  const token = req.headers['x-admin-token'];
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ success: false, message: 'Forbidden' });
-  }
-  next();
-}
-
-// GET /admin/log-level → consultar nivel actual
-router.get('/admin/log-level', adminAuth, (req, res) => {
-  res.json({ level: logger.getLevel() });
-});
-
-// POST /admin/log-level { "level": "debug", "resetAfterMs": 1800000 }
-router.post('/admin/log-level', adminAuth, (req, res) => {
-  const { level, resetAfterMs } = req.body;
-
-  if (!Object.values(LogLevel).includes(level)) {
-    return res.status(400).json({ success: false, message: 'Invalid level' });
-  }
-
-  logger.setLevel(level as LogLevel, resetAfterMs);
-  res.json({ success: true, level, resetAfterMs });
-});
-```
-
-**`ADMIN_TOKEN`** debe vivir en Secrets Manager (`dev/{servicio}` o `prod/{servicio}`), nunca en el código.
-
-### Flujo para investigar un error de producción
-
-```bash
-# 1. Activar debug por 30 minutos en el pod
-curl -X POST https://api.dev-sale.net/ms-sale-orders/admin/log-level \
-  -H "x-admin-token: $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"level":"debug","resetAfterMs":1800000}'
-
-# 2. Reproducir el error y observar en CloudWatch / Grafana
-# Los logs de debug aparecen como una sola línea JSON, filtrables por service + level
-
-# 3. El nivel vuelve a warn automáticamente al cumplirse resetAfterMs
-#    o se puede restaurar manualmente:
-curl -X POST https://api.dev-sale.net/ms-sale-orders/admin/log-level \
-  -H "x-admin-token: $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"level":"warn"}'
-```
-
-> **Nota de costo**: el modo debug puede multiplicar el volumen de logs en CloudWatch. Usar siempre `resetAfterMs` en producción.
-
-## Transports personalizados
-
-`LogTransport` es la interfaz para agregar destinos de log adicionales (métricas, alertas, tests):
+## Custom transports
 
 ```typescript
 import { LogTransport, logger } from '@smdv/logwise';
@@ -470,35 +362,50 @@ class MyTransport implements LogTransport {
 logger.addTransport(new MyTransport());
 ```
 
-> Los stubs `TransportFactory.createCloudWatchTransport`, `createELKTransport`, `createLokiTransport` y `createDatadogTransport` son placeholders para implementaciones futuras.
-
-## Scripts
-
-```bash
-npm run build   # compilar TypeScript
-npm run test    # ejecutar tests
-npm run lint    # ESLint
-npm run pack    # empaquetar
-```
-
-## Estructura
+## Package structure
 
 ```
 src/
-├── logger.ts          # Clase Logger principal
-├── middleware.ts      # Middleware Express (requestLogger, createRequestLogger)
-├── factory.ts         # createCustomLogger, TransportFactory
-├── types.ts           # Tipos e interfaces exportados
+├── logger.ts          # Logger class — core
+├── middleware.ts      # Express request logger
+├── factory.ts         # createCustomLogger
+├── types.ts           # Exported types and interfaces
 ├── constants.ts       # ENV_KEYS, DEFAULTS
 ├── xml.ts             # XmlProcessor
-├── http/              # Constantes HTTP y helpers
-├── errors/            # ApiError, clases de error, createErrorHandler
-├── messages/          # Mensajes i18n de respuesta API
-├── i18n/              # Mensajes i18n del logger
+├── messages/          # Internal i18n (not part of public API)
 ├── decorators/        # @Controller, @Get/@Post/…, @ValidateBody/…
 └── __tests__/
 ```
 
-## Licencia
+## Error handling and response formatting
+
+Error classes (`ApiError`, `NotFoundError`, `ValidationError`…), HTTP response helpers (`okResponse`, `notFoundResponse`…), exception handlers for AdonisJS/NestJS (`ExceptionHandlerV5`, `ExceptionHandlerV6`), and API messages (`Messages`, `getMessage`…) are provided by [`@smdv/middleware`](https://www.npmjs.com/package/@smdv/middleware).
+
+## Changelog
+
+### 2.1.0
+
+Removed from public API (moved to `@smdv/middleware`):
+- Error classes: `ApiError`, `NotFoundError`, `ValidationError`, `ForbiddenError`, etc.
+- Error handler: `handleError`, `createErrorHandler`, `asyncHandler`, `notFoundHandler`
+- Error codes: `ERROR_CODES`, `ERROR_MESSAGE_KEYS`
+- HTTP constants: `HTTP_OK`, `HTTP_NOT_FOUND`, `isSuccessCode`, `isClientError`, etc.
+- API messages: `Messages`, `getMessage`, `createMessageHelper`, `translate`
+
+`HttpStatusCode` enum stays in logwise (used for logging context, not HTTP responses).
+
+### 2.0.0
+
+Removed Winston. Native logger with `setLevel()`, `LOG_PRETTY`, automatic levels by `NODE_ENV`.
+
+## Scripts
+
+```bash
+npm run build   # compile TypeScript
+npm run test    # run tests
+npm run lint    # ESLint
+```
+
+## License
 
 MIT
