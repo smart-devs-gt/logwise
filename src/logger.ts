@@ -2,9 +2,9 @@ import { ENV_KEYS, DEFAULTS } from './constants';
 import { LogLevel, Environment, OutputFormat, SupportedLang, LogTransport } from './types';
 import { LoggerConfig, HttpStatusCode, ApplicationErrorCode, ErrorContext } from './types';
 import { XmlProcessor } from './xml';
-import { translate } from './i18n';
-import en from './i18n/en.json';
-import es from './i18n/es.json';
+import { translate } from './messages';
+import en from './messages/en.json';
+import es from './messages/es.json';
 
 const i18nMessages: Record<SupportedLang, Record<string, string>> = { en, es };
 
