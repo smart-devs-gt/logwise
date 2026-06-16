@@ -1,4 +1,5 @@
 import { ENV_KEYS, DEFAULTS } from './constants';
+import { getLogContext } from './context-store';
 import { LogLevel, Environment, OutputFormat, SupportedLang, LogTransport } from './types';
 import { LoggerConfig, HttpStatusCode, ApplicationErrorCode, ErrorContext } from './types';
 import { XmlProcessor } from './xml';
@@ -121,11 +122,16 @@ export class Logger {
     if (!this.shouldLog(level)) return;
 
     const { clean, stack } = this.extractMeta(meta);
+    // Contexto por request (ownerId, userId, requestId, ...) inyectado por
+    // @smdv/middleware vía AsyncLocalStorage. El meta explícito de la llamada
+    // tiene prioridad sobre el contexto (se aplica después).
+    const ctx = getLogContext();
     const entry: Record<string, any> = {
       level,
       message,
       service: this.config.service,
       timestamp: this.timestamp(),
+      ...(ctx || {}),
       ...clean,
       ...(stack ? { stack } : {}),
     };
