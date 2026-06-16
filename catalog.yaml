@@ -1,0 +1,88 @@
+# catalog.yaml — logwise
+# Engineering Intelligence & Release Governance Platform
+# Schema version: 1.1 | Last updated: 2026-06-11
+
+app_id: logwise
+name: Logwise Library
+description: >
+  Librería npm de logging estructurado para todos los microservicios Node.js
+  de Smart Sale. Publicada como @smdv/logwise. Estandariza formato de logs,
+  niveles, contexto de request y soporte XML. Usada por todos los MS Node.js
+  del stack — cambios tienen impacto transversal.
+type: lib
+status: active
+
+ownership:
+  squad: platform
+  owner_team: core
+  jira_component: logwise
+
+stack:
+  framework: node
+  runtime: node
+  language: typescript
+  version:
+    runtime: "18.x"
+    framework: null
+
+repository:
+  provider: codecommit
+  name: logwise
+  branch_default: develop
+  workspace_path: utilities/logwise
+
+deployment:
+  type: npm
+  package_name: "@smdv/logwise"
+  package_version: "2.1.0"
+  pipeline_name: logwise-pipeline
+
+communication:
+  http_clients: []
+  kafka_producer: []
+  kafka_consumer: []
+
+  shared:
+    mysql: false
+    redis: false
+    kafka: false
+    dynamodb: false
+
+health_profile:
+  last_reviewed: "2026-06-11"
+  reviewer: jhernandez
+
+  technical_debt:
+    level: low
+    notes: >
+      v2.1.0 activa y estable. Proceso de publicación npm documentado en
+      docs/LOGWISE.md. Migración de console.* y Adonis Logger hacia logwise
+      en 14 servicios planificada en docs/LOGWISE-MIGRATION-PLAN.md.
+      buildspec usa Node 18 — considerar actualizar a 20.x para alinear con
+      el runtime de los microservicios.
+
+  architecture:
+    has_defined_arch: true
+    follows_patterns: full
+    patterns_missing: []
+
+  policy_compliance:
+    secrets_manager: false
+    no_hardcoded_env: true
+    auth_pattern: false
+    conventional_commits: true
+
+  test_coverage:
+    current_pct: 0
+    new_code_target_pct: 85
+    has_unit_tests: true
+    has_integration_tests: false
+    notes: >
+      Tiene directorio __tests__ en src/. Cobertura real no medida.
+      Librería transversal — tests son críticos para evitar regresiones
+      silenciosas en todos los MS.
+
+  documentation:
+    has_readme: false
+    has_claude_md: false
+    has_adr: false
