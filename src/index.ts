@@ -5,6 +5,9 @@ export { LogLevel, OutputFormat, Environment, SupportedLang, LoggerConfig, Trans
 export { ENV_KEYS, DEFAULTS } from './constants';
 export { createCustomLogger } from './factory';
 
+// Contexto de log por request (AsyncLocalStorage). Poblado por @smdv/middleware.
+export { runWithLogContext, getLogContext, setLogContext, LogContext } from './context-store';
+
 // Decorators - Decoradores HTTP estilo NestJS para Express
 export {
   // Route decorators
