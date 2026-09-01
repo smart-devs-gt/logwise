@@ -27,6 +27,18 @@ export class Logger {
   private transports: LogTransport[];
   private xmlProcessor: XmlProcessor;
 
+  /**
+   * `true` cuando el nivel lo fijó quien construyó el logger (o `setLevel`).
+   *
+   * Cuando es `false`, el nivel se resuelve del entorno EN CADA EMISIÓN en vez
+   * de quedar congelado en el constructor. Sin esto, un servicio que crea su
+   * logger en import-time y recién después carga `LOG_LEVEL` desde Secrets
+   * Manager arranca en el default —`warn` bajo `NODE_ENV=production`— y
+   * descarta todos sus `info` para siempre. No falla nada: el servicio responde
+   * y su traza desaparece.
+   */
+  private levelIsExplicit: boolean;
+
   constructor(
     config?: Partial<LoggerConfig> & {
       lang?: SupportedLang;
@@ -55,6 +67,7 @@ export class Logger {
       logPretty: config?.logPretty ?? envLogPretty,
     };
 
+    this.levelIsExplicit = config?.level !== undefined;
     this.transports = transports ?? [];
     this.xmlProcessor = new XmlProcessor();
   }
@@ -92,8 +105,16 @@ export class Logger {
 
   // ─── Emisión de log ────────────────────────────────────────────────────────
 
+  /**
+   * Nivel vigente. Si nadie lo fijó explícitamente se relee del entorno, para
+   * que un `LOG_LEVEL` que llega después de construir el logger tenga efecto.
+   */
+  private effectiveLevel(): LogLevel {
+    return this.levelIsExplicit ? this.config.level : this.getLogLevel();
+  }
+
   private shouldLog(level: string): boolean {
-    return (LEVEL_ORDER[level] ?? 0) >= (LEVEL_ORDER[this.config.level] ?? 0);
+    return (LEVEL_ORDER[level] ?? 0) >= (LEVEL_ORDER[this.effectiveLevel()] ?? 0);
   }
 
   private timestamp(): string {
@@ -267,20 +288,25 @@ export class Logger {
    *                      Evita olvidar debug encendido en producción.
    */
   setLevel(level: LogLevel, resetAfterMs?: number): void {
-    const previous = this.config.level;
+    const previous = this.effectiveLevel();
+    const wasExplicit = this.levelIsExplicit;
     this.config.level = level;
+    this.levelIsExplicit = true;
     this.info('Log level changed', undefined, { from: previous, to: level, resetAfterMs });
 
     if (resetAfterMs && resetAfterMs > 0) {
       setTimeout(() => {
         this.config.level = previous;
+        // Se restaura también el MODO: si el nivel no era explícito, vuelve a
+        // seguir al entorno en vez de quedarse clavado en el valor restaurado.
+        this.levelIsExplicit = wasExplicit;
         this.info('Log level restored', undefined, { to: previous });
       }, resetAfterMs).unref(); // unref: no bloquea el cierre del proceso
     }
   }
 
   getLevel(): LogLevel {
-    return this.config.level;
+    return this.effectiveLevel();
   }
 
   // ─── Extensibilidad ────────────────────────────────────────────────────────
