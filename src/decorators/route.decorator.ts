@@ -17,7 +17,7 @@
  */
 
 import 'reflect-metadata';
-import type { Request, Response, Router, Application } from 'express';
+import type { NextFunction, Request, Response, Router, Application } from 'express';
 import { Logger } from '../logger';
 
 // Lazy getter — express solo se carga si realmente se usan los decorators
@@ -166,8 +166,20 @@ export function registerRoutes(
   const prefix: string = Reflect.getMetadata(CONTROLLER_PREFIX_KEY, controller.constructor) || '';
 
   routes.forEach((route) => {
-    const handler = (req: Request, res: Response) => {
-      return controller[route.methodName](req, res);
+    // `next` se propaga y el resultado se envuelve, por dos motivos distintos:
+    //
+    // 1. Un controller que deriva sus fallos con `next(error)` —el patrón
+    //    estándar de Express— recibía `undefined`. La llamada lanzaba
+    //    `TypeError: next is not a function` DENTRO de una promesa, así que no
+    //    llegaba al error handler: se convertía en un unhandled rejection y la
+    //    respuesta nunca se emitía. La request quedaba colgada hasta que el
+    //    cliente cortaba por su propio timeout, que es peor que un 500 — no
+    //    aparece como error en ningún tablero.
+    //
+    // 2. Un handler `async` que rechaza tampoco alcanzaba al error handler,
+    //    porque nadie encadenaba el `.catch`.
+    const handler = (req: Request, res: Response, next: NextFunction) => {
+      return Promise.resolve(controller[route.methodName](req, res, next)).catch(next);
     };
 
     const fullPath = route.path;
