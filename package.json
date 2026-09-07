@@ -81,7 +81,7 @@
     "semantic-release": "^22.0.12",
     "standard-version": "^9.5.0",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.9.2"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=16.0.0"
